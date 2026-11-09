@@ -1,6 +1,6 @@
 [package]
 name = "linx"
-version = "1.0.0"
+version = "1.0.1"
 description = "Linx - обработка социометрии"
 edition = "2021"
 

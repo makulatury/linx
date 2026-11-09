@@ -250,7 +250,10 @@
       var m = R + 40;
       var minX = Math.min.apply(null, xs) - m, maxX = Math.max.apply(null, xs) + m;
       var minY = Math.min.apply(null, ys) - m, maxY = Math.max.apply(null, ys) + m + 20;
-      var w = Math.max(maxX - minX, 300), h = Math.max(maxY - minY, 220);
+      // Не увеличивать сильнее обычного масштаба (иначе один-два узла раздуваются на всё поле)
+      // и держать узлы по центру, если поле шире, чем они занимают
+      var w = Math.max(maxX - minX, W * 0.75), h = Math.max(maxY - minY, H * 0.75);
+      minX = (minX + maxX - w) / 2; minY = (minY + maxY - h) / 2;
       var ratio = W / H;
       if (w / h > ratio) { var nh = w / ratio; minY -= (nh - h) / 2; h = nh; } else { var nw = h * ratio; minX -= (nw - w) / 2; w = nw; }
       vb = { x: minX, y: minY, w: w, h: h }; fitW = w; applyVb();
