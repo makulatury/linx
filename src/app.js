@@ -220,7 +220,7 @@
   // ---------- Создание ----------
   function createDialog() {
     SM.store.listProtocols().then(function (list) {
-      var nameInp = h('input', { type: 'text', class: 'input', placeholder: 'Например, 7 «Б», сентябрь 2026' });
+      var nameInp = h('input', { type: 'text', class: 'input', placeholder: 'Например, отдел продаж, сентябрь 2026' });
       var mode = 'later';
       var fileInp = h('input', { type: 'file', accept: '.xlsx,.xls,.csv,.txt' });
       var hasChoices = h('input', { type: 'checkbox' });
