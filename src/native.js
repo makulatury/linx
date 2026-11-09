@@ -1,11 +1,10 @@
-/* Мост к настольной программе (Tauri). В обычном браузере ничего не делает.
-   В программе:
+/* Связь интерфейса с программой (Tauri):
    - window.smNativeStore - хранение базы в файлах на диске (папка данных программы);
    - SM.util.download - сохранение файлов через системное окно «Сохранить как». */
 (function (root) {
   'use strict';
   var T = root.__TAURI__;
-  if (!T || !T.core) return;
+  if (!T || !T.core) return; // вне программы хранилища нет - app.js покажет сообщение
   var invoke = T.core.invoke;
 
   root.smNativeStore = {

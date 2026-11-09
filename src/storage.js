@@ -1,64 +1,14 @@
-/* Слой хранения. Интерфейс один, движок подменяемый:
-   - по умолчанию IndexedDB в браузере;
-   - если окно предоставляет window.smNativeStore (нативная обёртка, например Tauri),
-     используется он (те же методы, возвращают Promise).
-   Методы: listProtocols, getProtocol, putProtocol, deleteProtocol,
-           getSetting, putSetting, exportAll, importAll. */
+/* Слой хранения. База хранится программой на диске (window.smNativeStore из native.js).
+   Методы движка: listProtocols, getProtocol, putProtocol, deleteProtocol, clearProtocols,
+                  getSetting, putSetting (все возвращают Promise).
+   Здесь же - выгрузка и загрузка всей базы одним файлом (exportAll, importAll). */
 (function (root) {
   'use strict';
-  var DB_NAME = 'sociometry-offline';
-  var DB_VER = 1;
-
-  function req2p(r) {
-    return new Promise(function (res, rej) {
-      r.onsuccess = function () { res(r.result); };
-      r.onerror = function () { rej(r.error); };
-    });
-  }
-
-  function IdbBackend() {
-    var dbp = null;
-    function db() {
-      if (!dbp) {
-        dbp = new Promise(function (res, rej) {
-          var r = indexedDB.open(DB_NAME, DB_VER);
-          r.onupgradeneeded = function () {
-            var d = r.result;
-            if (!d.objectStoreNames.contains('protocols')) d.createObjectStore('protocols', { keyPath: 'id' });
-            if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', { keyPath: 'key' });
-          };
-          r.onsuccess = function () { res(r.result); };
-          r.onerror = function () { rej(r.error); };
-        });
-      }
-      return dbp;
-    }
-    function tx(store, mode, fn) {
-      return db().then(function (d) {
-        return new Promise(function (res, rej) {
-          var t = d.transaction(store, mode), s = t.objectStore(store), out;
-          Promise.resolve(fn(s)).then(function (v) { out = v; });
-          t.oncomplete = function () { res(out); };
-          t.onerror = function () { rej(t.error); };
-          t.onabort = function () { rej(t.error); };
-        });
-      });
-    }
-    this.listProtocols = function () { return tx('protocols', 'readonly', function (s) { return req2p(s.getAll()); }); };
-    this.getProtocol = function (id) { return tx('protocols', 'readonly', function (s) { return req2p(s.get(id)); }); };
-    this.putProtocol = function (p) { return tx('protocols', 'readwrite', function (s) { return req2p(s.put(p)); }); };
-    this.deleteProtocol = function (id) { return tx('protocols', 'readwrite', function (s) { return req2p(s.delete(id)); }); };
-    this.getSetting = function (key) {
-      return tx('settings', 'readonly', function (s) { return req2p(s.get(key)); })
-        .then(function (r) { return r ? r.value : undefined; });
-    };
-    this.putSetting = function (key, value) {
-      return tx('settings', 'readwrite', function (s) { return req2p(s.put({ key: key, value: value })); });
-    };
-    this.clearProtocols = function () { return tx('protocols', 'readwrite', function (s) { return req2p(s.clear()); }); };
-  }
-
-  var backend = root.smNativeStore || new IdbBackend();
+  function missing() { return Promise.reject(new Error('Хранилище недоступно: откройте программу Linx.')); }
+  var backend = root.smNativeStore || {
+    listProtocols: missing, getProtocol: missing, putProtocol: missing, deleteProtocol: missing,
+    clearProtocols: missing, getSetting: missing, putSetting: missing
+  };
 
   var FORMAT = 'sociometry-offline-db';
 

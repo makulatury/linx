@@ -10,7 +10,6 @@ dist/
 __pycache__/
 .DS_Store
 Thumbs.db
-.claude/
 
 # Сборка программы для Windows (Tauri)
 src-tauri/target/
