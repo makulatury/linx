@@ -238,10 +238,34 @@ fn data_info(info: State<DataInfo>) -> DataInfo {
     info.inner().clone()
 }
 
+/// Сведения «О программе»: версия, лицензия, список сторонних компонентов (JSON-строка).
+#[derive(serde::Serialize)]
+struct AboutInfo {
+    version: String,
+    license: &'static str,
+    components: &'static str,
+}
+
+#[tauri::command]
+fn about_info(app: AppHandle) -> AboutInfo {
+    AboutInfo {
+        version: app.package_info().version.to_string(),
+        license: include_str!("../../LICENSE"),
+        components: include_str!("../third_party/components.json"),
+    }
+}
+
+/// Полные тексты лицензий сторонних компонентов.
+#[tauri::command]
+fn third_party_licenses() -> &'static str {
+    include_str!("../third_party/THIRD-PARTY-LICENSES.txt")
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let (dir, info) = choose_data_dir(app.handle());
             fs::create_dir_all(dir.join("protocols"))?;
@@ -258,7 +282,9 @@ pub fn run() {
             setting_get,
             setting_put,
             save_file,
-            data_info
+            data_info,
+            about_info,
+            third_party_licenses
         ])
         .run(tauri::generate_context!())
         .expect("не удалось запустить Linx");

@@ -55,6 +55,13 @@
     if (info.portable) return 'Это переносная версия: все протоколы, фото и ваши тексты хранятся в папке «Linx-данные» рядом с программой (' + info.dir + '). Программу можно переносить вместе с этой папкой, например на флешке.' + tail;
     return 'Все протоколы, фото и ваши тексты хранятся на этом компьютере в папке ' + info.dir + '.' + tail;
   };
+  // «О программе»: версия, лицензия, сторонние компоненты; ссылки открываются во внешнем браузере
+  root.SM.nativeAbout = function () {
+    return invoke('about_info').then(function (a) { a.components = JSON.parse(a.components); return a; });
+  };
+  root.SM.nativeThirdPartyText = function () { return invoke('third_party_licenses'); };
+  root.SM.openUrl = function (url) { return T.opener.openUrl(url); };
+
   invoke('data_info').then(function (i) {
     info = i;
     if (!i.warning) return;

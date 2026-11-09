@@ -2,8 +2,9 @@
 
 Делает в папке release/ две версии:
   Linx_<версия>_setup.exe    - установщик;
-  Linx_<версия>_portable.zip - переносная версия без установки: папка Linx с программой
-                               и папкой «Linx-данные», в которой хранится база.
+  Linx_<версия>_portable.zip - переносная версия без установки: папка Linx с программой,
+                               папкой «Linx-данные» (в ней хранится база) и файлами лицензий.
+Перед сборкой обновляется список сторонних компонентов (third_party.py).
 Нужны Rust, Visual Studio Build Tools (C++) и tauri-cli (см. README).
 """
 import json
@@ -12,6 +13,8 @@ import shutil
 import subprocess
 import zipfile
 from pathlib import Path
+
+import third_party
 
 ROOT = Path(__file__).parent
 TAURI = ROOT / "src-tauri"
@@ -29,6 +32,8 @@ def main():
 
     env = dict(os.environ)
     env["PATH"] = str(Path.home() / ".cargo" / "bin") + os.pathsep + env.get("PATH", "")
+    # Список сторонних компонентов и тексты их лицензий (встраиваются в программу)
+    third_party.main()
     # Сборка программы и установщика (внутри запускается build.py)
     cargo = shutil.which("cargo", path=env["PATH"])
     if not cargo:
@@ -46,6 +51,8 @@ def main():
     zip_out = OUT / f"Linx_{version}_portable.zip"
     with zipfile.ZipFile(zip_out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         z.write(exe, "Linx/Linx.exe")
+        z.write(ROOT / "LICENSE", "Linx/LICENSE.txt")
+        z.write(TAURI / "third_party" / "THIRD-PARTY-LICENSES.txt", "Linx/THIRD-PARTY-LICENSES.txt")
         z.writestr(f"Linx/{DATA_DIR}/Прочтите.txt", DATA_README.encode("utf-8-sig"))
 
     for f in (setup_out, zip_out):

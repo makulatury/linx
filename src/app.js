@@ -350,7 +350,48 @@
       P('Статусы определяются по числу полученных положительных выборов относительно среднего по группе (пороги - округлённые 2, 1.5 и 0.5 среднего) и по соотношению отрицательных выборов. Пороги для конкретной группы видны в легенде отчёта.'),
       P('Групповые индексы Gg и Kg считаются по числу участников, имеющих взаимные связи, делённому на число возможных пар; классический вариант через число пар показан в пояснении. Все значения округляются до двух знаков.'),
       S('Тексты'),
-      P('Все пояснения, легенда, интерпретация и рекомендации редактируются в разделе «Тексты отчёта». В фигурных скобках - подстановки: {N} заменится числом, {N:участник|участника|участников} - словом в нужном падеже.')));
+      P('Все пояснения, легенда, интерпретация и рекомендации редактируются в разделе «Тексты отчёта». В фигурных скобках - подстановки: {N} заменится числом, {N:участник|участника|участников} - словом в нужном падеже.'),
+      aboutBlock(S, P)));
+  }
+
+  // ---------- О программе ----------
+  var REPO = 'https://github.com/makulatury/linx';
+  function aboutBlock(S, P) {
+    var box = h('div', { class: 'about' });
+    if (!SM.nativeAbout) return box;
+    SM.nativeAbout().then(function (a) {
+      var comps = a.components, counts = {};
+      // Отдельные лицензии из выражений вида «MIT OR Apache-2.0», «MIT/Apache-2.0»
+      comps.forEach(function (c) {
+        c.license.split(/\s+OR\s+|\s+AND\s+|\s*\/\s*|[()]/).map(function (x) { return x.trim(); }).filter(Boolean)
+          .forEach(function (x) { if (!/^см\.|^не указана/.test(x)) counts[x] = (counts[x] || 0) + 1; });
+      });
+      var lic = Object.keys(counts).sort(function (x, y) { return counts[y] - counts[x]; });
+      var tauri = comps.filter(function (c) { return c.name === 'tauri'; })[0];
+      var link = h('a', { href: REPO, onclick: function (e) { e.preventDefault(); SM.openUrl(REPO).catch(function () { U.toast('Не удалось открыть ссылку', 'error'); }); } }, REPO);
+      var full = h('pre', { class: 'about-text' }, 'Загрузка...');
+      var fullBox = h('details', null, h('summary', null, 'Тексты лицензий сторонних компонентов'), full);
+      fullBox.addEventListener('toggle', function () {
+        if (fullBox.open && !full.dataset.loaded) SM.nativeThirdPartyText().then(function (t) { full.textContent = t; full.dataset.loaded = '1'; });
+      });
+      box.appendChild(h('div', null,
+        S('О программе'),
+        P('Linx, версия ' + a.version + '. © 2026 makulatury.'),
+        h('p', null, 'Распространяется по лицензии MIT. Исходный код: ', link, '.'),
+        h('details', null, h('summary', null, 'Текст лицензии MIT'), h('pre', { class: 'about-text' }, a.license)),
+        P('Программа предоставляется «как есть», без каких-либо гарантий.'),
+        P('Результаты отчёта не являются психологическим диагнозом и не заменяют профессиональную оценку.'),
+        S('Использованные компоненты'),
+        P('Программа построена на Tauri' + (tauri ? ' ' + tauri.version + ' (' + tauri.license + ')' : '') + ' и использует ' + comps.length +
+          ' библиотек на Rust. Все они распространяются по свободным лицензиям: ' + lic.join(', ') + '. Окно программы показывает системный компонент Microsoft Edge WebView2.'),
+        P('Тексты лицензий также лежат рядом с программой в файле THIRD-PARTY-LICENSES.txt.'),
+        h('details', null, h('summary', null, 'Список компонентов'),
+          h('div', { class: 'table-scroll' }, h('table', { class: 'tbl' },
+            h('thead', null, h('tr', null, h('th', null, 'Компонент'), h('th', null, 'Версия'), h('th', null, 'Лицензия'))),
+            h('tbody', null, comps.map(function (c) { return h('tr', null, h('td', null, c.name), h('td', null, c.version), h('td', null, c.license)); }))))),
+        fullBox));
+    }).catch(function () {});
+    return box;
   }
 
   // ---------- Запуск ----------

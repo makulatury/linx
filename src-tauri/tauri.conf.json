@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Linx",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "identifier": "com.makulatury.linx",
   "build": {
     "frontendDist": "../dist",
@@ -29,7 +29,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "publisher": "Linx",
     "shortDescription": "Обработка социометрии",
     "longDescription": "Linx - офлайн-обработка социометрии: индексы, статусы, отчёты, социограммы, выгрузка в Word и Excel.",
@@ -42,9 +44,17 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["Russian"],
+        "languages": [
+          "Russian"
+        ],
         "displayLanguageSelector": false
       }
+    },
+    "licenseFile": "../LICENSE",
+    "copyright": "© 2026 makulatury",
+    "resources": {
+      "../LICENSE": "LICENSE.txt",
+      "third_party/THIRD-PARTY-LICENSES.txt": "THIRD-PARTY-LICENSES.txt"
     }
   }
 }

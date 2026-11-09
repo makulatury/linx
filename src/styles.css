@@ -312,3 +312,10 @@ ul.plain li { padding: 3px 0; border-bottom: 1px dashed var(--line2); }
   a { color: inherit; }
   h1 { font-size: 18pt; }
 }
+
+/* Справка: «О программе» */
+.about details { margin: 8px 0; }
+.about summary { cursor: pointer; font-weight: 600; }
+.about-text { white-space: pre-wrap; max-height: 360px; overflow: auto; font-size: 12px; line-height: 1.45; background: #f6f7f9; padding: 12px; border-radius: 8px; }
+.about .tbl { font-size: 13px; }
+@media print { .about { display: none; } }
