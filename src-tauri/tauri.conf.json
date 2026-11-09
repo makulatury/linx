@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Linx",
+  "version": "1.0.0",
+  "identifier": "com.makulatury.linx",
+  "build": {
+    "frontendDist": "../dist",
+    "beforeBuildCommand": "python build.py",
+    "beforeDevCommand": "python build.py"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Linx - социометрия",
+        "url": "Linx.html",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 900,
+        "minHeight": 600,
+        "center": true,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Linx",
+    "shortDescription": "Обработка социометрии",
+    "longDescription": "Linx - офлайн-обработка социометрии: индексы, статусы, отчёты, социограммы, выгрузка в Word и Excel.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["Russian"],
+        "displayLanguageSelector": false
+      }
+    }
+  }
+}

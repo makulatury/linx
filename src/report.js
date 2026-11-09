@@ -536,8 +536,9 @@
       sheets.push({ name: 'Социограммы', rows: rows, widths: [100], drawings: drawings });
       return X.xlsx(sheets);
     }).then(function (blob) {
-      U.download(blob, safeName(proto.name) + ' - данные.xlsx');
-      U.toast('Файл Excel сохранён. Лист «Выборы» можно загрузить обратно как файл с выборами.');
+      return Promise.resolve(U.download(blob, safeName(proto.name) + ' - данные.xlsx')).then(function (ok) {
+        if (ok !== false) U.toast('Файл Excel сохранён. Лист «Выборы» можно загрузить обратно как файл с выборами.');
+      });
     }).catch(function (e) { U.toast('Не удалось сделать файл Excel: ' + e.message, 'error'); });
   }
 
@@ -693,7 +694,7 @@
         });
         fname = safeName(proto.name) + ' - взаимные выборы.docx';
       }
-      return doc.build().then(function (blob) { U.download(blob, fname); U.toast('Документ Word сохранён'); });
+      return doc.build().then(function (blob) { return U.download(blob, fname); }).then(function (ok) { if (ok !== false) U.toast('Документ Word сохранён'); });
     }).catch(function (e) { U.toast('Не удалось сделать документ: ' + e.message, 'error'); });
   }
 
