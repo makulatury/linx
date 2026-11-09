@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Тесты расчётов</title>
+<style>body{font:14px/1.5 system-ui;padding:20px}.ok{color:#15803d}.bad{color:#b91c1c;font-weight:bold}</style>
+</head><body>
+<h1>Тесты модуля расчётов</h1>
+<div id="out"></div>
+<script src="../src/calc.js"></script>
+<script src="../src/fixtures.js"></script>
+<script src="reference_cases.js"></script>
+<script>
+(function () {
+  var C = SM.calc, F = SM.fixtures, out = [], pass = 0, fail = 0;
+  function check(name, got, exp) {
+    var ok = got === exp;
+    ok ? pass++ : fail++;
+    out.push('<div class="' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'OK' : 'FAIL') + ' ' + name + ': ' + got + (ok ? '' : ' (ожидалось ' + exp + ')') + '</div>');
+  }
+  // Статусы
+  F.statusCases.forEach(function (c) {
+    check('статус R+=' + c[0] + ' R-=' + c[1] + ' m+=' + c[2], C.statusOf(c[0], c[1], c[2]), c[3]);
+  });
+  // Группа 3
+  var g = F.group3();
+  var a = C.analyze(C.buildMatrix(g.participants, g.choices));
+  check('группа 3: m+', a.mPlus, 1.75);
+  Object.keys(F.group3Expected).forEach(function (k) {
+    var v = a.group[k];
+    check('группа 3: ' + k, k === 'componentsCount' ? v : C.round2(v), F.group3Expected[k]);
+  });
+  var st = a.personal.map(function (p) { return p.status; }).join(',');
+  check('группа 3: статусы', st, 'star,preferred,accepted,accepted,accepted,accepted,accepted,rejected');
+  // Персональные (A: R+=4, S+=4, N-1=7)
+  check('A Ci+', C.round2(a.personal[0].CiPos), 0.57);
+  check('A Куд', a.personal[0].Kud, 1);
+  check('B Куд', a.personal[1].Kud, 3);
+  check('H Ci', C.round2(a.personal[7].Ci), -0.43);
+  check('H E', C.round2(a.personal[7].E), 0.43);
+  // Округление
+  check('round 0.875', C.round2(0.875), 0.88);
+  check('round 1.125', C.round2(1.125), 1.13);
+  check('round 2.875', C.round2(23 / 8), 2.88);
+  // Рекомендации: эталонные варианты
+  REFERENCE_CASES.recs.forEach(function (rc) {
+    check('рекомендации: ' + rc[0], C.recommendations(C.analyze(rc[1])).join(','), rc[2].join(','));
+  });
+  // Индивидуальные социограммы: все участники эталонной группы, + и -
+  var E = REFERENCE_CASES.ego;
+  E.cases.forEach(function (cs) {
+    var key = function (list) { return list.map(function (x) { return x[0] + '>' + x[1] + (x[2] ? '*' : ''); }).sort().join(' '); };
+    var ours = C.egoEdges(E.M, cs[0], cs[1]).edges.map(function (x) { return [x.from, x.to, x.mutual]; });
+    check('социограмма ' + E.names[cs[0]] + (cs[1] > 0 ? ' +' : ' -'), key(ours) === key(cs[2]) ? 'совпадает' : key(ours), 'совпадает');
+  });
+  out.unshift('<h2 class="' + (fail ? 'bad' : 'ok') + '">Пройдено ' + pass + ', ошибок ' + fail + '</h2>');
+  document.getElementById('out').innerHTML = out.join('');
+  window.TEST_RESULT = { pass: pass, fail: fail };
+})();
+</script>
+</body></html>
