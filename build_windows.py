@@ -32,6 +32,9 @@ def main():
 
     env = dict(os.environ)
     env["PATH"] = str(Path.home() / ".cargo" / "bin") + os.pathsep + env.get("PATH", "")
+    # Не записывать в программу пути с этого компьютера (имя пользователя, папки проекта)
+    remap = [(Path.home(), "~"), (ROOT.resolve(), "linx")]
+    env["RUSTFLAGS"] = " ".join(f"--remap-path-prefix={src}={dst}" for src, dst in remap)
     # Список сторонних компонентов и тексты их лицензий (встраиваются в программу)
     third_party.main()
     # Сборка программы и установщика (внутри запускается build.py)
