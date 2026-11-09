@@ -1,6 +1,7 @@
 //! Linx: окно с веб-интерфейсом и хранение базы на диске.
 //!
-//! База лежит в папке данных программы (%APPDATA%\com.makulatury.linx\data):
+//! База лежит в папке «Linx-данные» рядом с программой (переносная версия),
+//! а если такой папки нет - в папке данных программы (%APPDATA%\com.makulatury.linx\data):
 //!   protocols\<id>.json - по файлу на протокол;
 //!   settings.json       - настройки и пользовательские тексты.
 //! Запись идёт через временный файл с последующим переименованием,
@@ -185,11 +186,56 @@ fn percent_decode(s: &str) -> Result<String, String> {
     String::from_utf8(out).map_err(err)
 }
 
-fn data_dir(app: &AppHandle) -> PathBuf {
-    app.path()
+/// Имя папки переносной версии: если она лежит рядом с программой, база хранится в ней.
+const PORTABLE_DIR: &str = "Linx-данные";
+
+/// Где лежит база и почему.
+#[derive(Clone, serde::Serialize)]
+struct DataInfo {
+    dir: String,
+    portable: bool,
+    /// Непустое, если папку переносной версии нельзя использовать и база временно в AppData
+    warning: Option<String>,
+}
+
+fn can_write(dir: &Path) -> bool {
+    let probe = dir.join(".linx-write-test");
+    let ok = fs::write(&probe, b"ok").is_ok();
+    let _ = fs::remove_file(&probe);
+    ok
+}
+
+fn choose_data_dir(app: &AppHandle) -> (PathBuf, DataInfo) {
+    let appdata = app
+        .path()
         .app_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
-        .join("data")
+        .join("data");
+    let portable = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|p| p.join(PORTABLE_DIR)))
+        .filter(|p| p.is_dir());
+    let mut warning = None;
+    if let Some(dir) = portable {
+        if can_write(&dir) {
+            let info = DataInfo { dir: dir.display().to_string(), portable: true, warning: None };
+            return (dir, info);
+        }
+        warning = Some(format!(
+            "Нет прав на запись в папку «{}». База временно сохраняется в папке пользователя. \
+             Перенесите программу вместе с папкой «{}» туда, где можно записывать файлы \
+             (например, на рабочий стол, в «Документы» или на флешку).",
+            dir.display(),
+            PORTABLE_DIR
+        ));
+    }
+    let info = DataInfo { dir: appdata.display().to_string(), portable: false, warning };
+    (appdata, info)
+}
+
+#[tauri::command]
+fn data_info(info: State<DataInfo>) -> DataInfo {
+    info.inner().clone()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -197,9 +243,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let dir = data_dir(app.handle());
+            let (dir, info) = choose_data_dir(app.handle());
             fs::create_dir_all(dir.join("protocols"))?;
             app.manage(Store { dir, lock: Mutex::new(()) });
+            app.manage(info);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -210,7 +257,8 @@ pub fn run() {
             store_clear,
             setting_get,
             setting_put,
-            save_file
+            save_file,
+            data_info
         ])
         .run(tauri::generate_context!())
         .expect("не удалось запустить Linx");

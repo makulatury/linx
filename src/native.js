@@ -46,4 +46,25 @@
   if (root.SM && root.SM.util) root.SM.util.download = nativeDownload;
   root.SM = root.SM || {};
   root.SM.native = true;
+
+  // Где лежит база: папка «Linx-данные» рядом с программой (переносная версия) или папка пользователя.
+  // Текст для справки; до ответа программы - общий вариант.
+  var info = null;
+  root.SM.nativeDataText = function () {
+    var tail = ' Интернет не нужен. Регулярно нажимайте «Сохранить базу в файл» - это резервная копия. Этот же файл переносит базу на другой компьютер: там откройте программу и нажмите «Загрузить из файла».';
+    if (!info) return 'Все протоколы, фото и ваши тексты хранятся на этом компьютере в папке данных программы.' + tail;
+    if (info.portable) return 'Это переносная версия: все протоколы, фото и ваши тексты хранятся в папке «Linx-данные» рядом с программой (' + info.dir + '). Программу можно переносить вместе с этой папкой, например на флешке.' + tail;
+    return 'Все протоколы, фото и ваши тексты хранятся на этом компьютере в папке ' + info.dir + '.' + tail;
+  };
+  invoke('data_info').then(function (i) {
+    info = i;
+    if (!i.warning) return;
+    // Показать, когда интерфейс уже построен
+    var show = function () {
+      var U = root.SM.util;
+      U.modal('Папка для базы недоступна', U.h('p', null, i.warning), [{ label: 'Понятно', kind: 'primary', value: true }]);
+    };
+    if (document.readyState === 'complete') setTimeout(show, 300);
+    else root.addEventListener('load', function () { setTimeout(show, 300); });
+  }).catch(function () {});
 })(window);
