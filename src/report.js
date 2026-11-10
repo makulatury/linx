@@ -26,7 +26,7 @@
         close();
         var models = getModels();
         U.copyRich(TK.toHtml(models, !!App.bw), TK.toText(models))
-          .then(function () { U.toast('Таблица скопирована - вставьте её в Word или Excel (Ctrl+V)'); })
+          .then(function () { U.toast('Таблица скопирована - вставьте её в Word или Excel (' + U.pasteKey + ')'); })
           .catch(function (e) { U.toast('Не удалось скопировать: ' + e.message, 'error'); });
       } }, 'Копировать как таблицу'),
       h('button', { type: 'button', role: 'menuitem', onclick: function () {
@@ -38,7 +38,7 @@
         var job = (navigator.clipboard && window.ClipboardItem)
           ? navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
           : Promise.reject(new Error('браузер не умеет копировать картинки'));
-        job.then(function () { U.toast('Картинка таблицы скопирована - вставьте её в Word, презентацию или сообщение (Ctrl+V)'); })
+        job.then(function () { U.toast('Картинка таблицы скопирована - вставьте её в Word, презентацию или сообщение (' + U.pasteKey + ')'); })
           .catch(function (e) { U.toast('Не удалось скопировать картинку: ' + e.message + '. Используйте «Скачать PNG».', 'error'); });
       } }, 'Копировать PNG'),
       h('button', { type: 'button', role: 'menuitem', onclick: function () {

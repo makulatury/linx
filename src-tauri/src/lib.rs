@@ -1,7 +1,8 @@
 //! Linx: окно с веб-интерфейсом и хранение базы на диске.
 //!
 //! База лежит в папке «Linx-данные» рядом с программой (переносная версия),
-//! а если такой папки нет - в папке данных программы (%APPDATA%\com.makulatury.linx\data):
+//! а если такой папки нет - в папке данных программы (Windows: %APPDATA%\com.makulatury.linx\data,
+//! macOS: ~/Library/Application Support/com.makulatury.linx/data):
 //!   protocols\<id>.json - по файлу на протокол;
 //!   settings.json       - настройки и пользовательские тексты.
 //! Запись идёт через временный файл с последующим переименованием,
@@ -12,7 +13,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::ipc::{InvokeBody, Request};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, State, WebviewWindow};
 
 struct Store {
     dir: PathBuf,
@@ -261,6 +262,13 @@ fn third_party_licenses() -> &'static str {
     include_str!("../third_party/THIRD-PARTY-LICENSES.txt")
 }
 
+/// Окно печати. На macOS window.print() из страницы ничего не делает, поэтому печать идёт через оболочку
+/// (на Windows она сама вызывает window.print()).
+#[tauri::command]
+fn print_page(window: WebviewWindow) -> Result<(), String> {
+    window.print().map_err(err)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -294,7 +302,8 @@ pub fn run() {
             save_file,
             data_info,
             about_info,
-            third_party_licenses
+            third_party_licenses,
+            print_page
         ])
         .run(tauri::generate_context!())
         .expect("не удалось запустить Linx");

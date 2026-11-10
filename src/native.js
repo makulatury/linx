@@ -65,6 +65,7 @@
   };
   root.SM.nativeThirdPartyText = function () { return invoke('third_party_licenses'); };
   root.SM.openUrl = function (url) { return T.opener.openUrl(url); };
+  root.SM.print = function () { return invoke('print_page'); };
 
   invoke('data_info').then(function (i) {
     info = i;

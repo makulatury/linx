@@ -1,6 +1,6 @@
 """Список сторонних компонентов программы и тексты их лицензий: python third_party.py
 
-Берёт из `cargo metadata` все библиотеки, которые попадают в программу для Windows
+Берёт из `cargo metadata` все библиотеки, которые попадают в программу для заданной платформы
 (без библиотек только для сборки и тестов), и пишет в src-tauri/third_party/:
   components.json          - название, версия, лицензия (показывается в «Справке»);
   THIRD-PARTY-LICENSES.txt - тексты лицензий (кладётся рядом с программой).
@@ -15,17 +15,16 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 TAURI = ROOT / "src-tauri"
 OUT = TAURI / "third_party"
-TARGET = "x86_64-pc-windows-msvc"
 LICENSE_NAMES = ("license", "licence", "copying", "notice")
 
 
-def cargo():
+def cargo(target):
     env = dict(os.environ)
     env["PATH"] = str(Path.home() / ".cargo" / "bin") + os.pathsep + env.get("PATH", "")
     exe = shutil.which("cargo", path=env["PATH"])
     if not exe:
         raise SystemExit("Не найден cargo: установите Rust (см. README)")
-    out = subprocess.run([exe, "metadata", "--format-version", "1", "--filter-platform", TARGET],
+    out = subprocess.run([exe, "metadata", "--format-version", "1", "--filter-platform", target],
                          cwd=TAURI, env=env, capture_output=True, check=True)
     return json.loads(out.stdout)
 
@@ -62,8 +61,8 @@ def license_texts(pkg):
     return files
 
 
-def main():
-    pkgs = shipped(cargo())
+def main(target="x86_64-pc-windows-msvc"):
+    pkgs = shipped(cargo(target))
     OUT.mkdir(exist_ok=True)
     components, by_text, missing = [], {}, []
     for p in pkgs:

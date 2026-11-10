@@ -154,10 +154,13 @@
     return function () { var a = arguments, self = this; clearTimeout(t); t = setTimeout(function () { fn.apply(self, a); }, ms); };
   }
 
+  // Программа собирается для Windows и macOS: отличаются подписи клавиш и пара текстов в справке
+  var mac = /Mac/.test(navigator.platform);
+
   root.SM = root.SM || {};
   root.SM.util = {
     h: h, uid: uid, download: download, fmtDate: fmtDate, fmtDateTime: fmtDateTime, toast: toast,
     modal: modal, confirmBox: confirmBox, readPhoto: readPhoto, pickFile: pickFile, debounce: debounce,
-    copyRich: copyRich, copyImage: copyImage
+    copyRich: copyRich, copyImage: copyImage, mac: mac, pasteKey: mac ? '⌘V' : 'Ctrl+V'
   };
 })(window);
