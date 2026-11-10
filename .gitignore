@@ -11,9 +11,10 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Сборка программы для Windows (Tauri)
+# Сборка программы (Tauri)
 src-tauri/target/
 src-tauri/gen/
 *.exe
 *.msi
+*.dmg
 release/

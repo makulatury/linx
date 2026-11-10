@@ -1,0 +1,40 @@
+# Сборка для macOS. Запускается сама при публикации релиза и прикладывает к нему
+# Linx_<версия>_macos.dmg. Можно запустить и вручную (Actions → macOS → Run workflow):
+# тогда образ останется в артефактах запуска, а если указать тег - попадёт в его релиз.
+name: macOS
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Тег релиза, к которому приложить образ (пусто - только артефакт)
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG || github.ref }}
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli@2
+      - run: python3 build_macos.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Linx-macos
+          path: release/*.dmg
+          if-no-files-found: error
+      - if: env.TAG != ''
+        run: gh release upload "$TAG" release/*.dmg --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

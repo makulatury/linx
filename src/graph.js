@@ -388,7 +388,7 @@
       var job = (navigator.clipboard && window.ClipboardItem)
         ? navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
         : png.then(U.copyImage);
-      job.then(function () { U.toast('Социограмма скопирована - вставьте её в Word, Excel или сообщение (Ctrl+V)'); })
+      job.then(function () { U.toast('Социограмма скопирована - вставьте её в Word, Excel или сообщение (' + U.pasteKey + ')'); })
         .catch(function (e) { U.toast('Не удалось скопировать: ' + (e && e.message || e) + '. Используйте «Скачать PNG».', 'error'); });
     }, 'Скопировать картинку в буфер обмена');
     if (opts.onSaveLayout) {
