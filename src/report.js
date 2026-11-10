@@ -334,10 +334,11 @@
   function general(container, proto) {
     if (!guard(container, proto)) return;
     var A = calc.analyzeProtocol(proto), a = A.main, ps = proto.participants;
+    var wide = a.N > 16 ? 'wide-sec' : '';
     container.appendChild(section('Социоматрица', h('div', null,
       h('p', { class: 'muted small' }, 'Строка - кто выбирает, столбец - кого выбрали. Итоговые строки внизу - полученные выборы.'),
-      matrixTable(a, ps)), '', function () { return mMatrix(a, ps); }));
-    if (A.perc) container.appendChild(section('Перцептивная социоматрица', matrixTable(A.perc, ps), '', function () { return mMatrix(A.perc, ps); }));
+      matrixTable(a, ps)), wide, function () { return mMatrix(a, ps); }));
+    if (A.perc) container.appendChild(section('Перцептивная социоматрица', matrixTable(A.perc, ps), wide, function () { return mMatrix(A.perc, ps); }));
     container.appendChild(section('Пары', pairsBlock(A, ps), '', function () { return mPairs(A, ps); }));
     container.appendChild(section('Персональные индексы', personalTable(A, proto), '', function () { return mPersonal(A, ps); }));
     container.appendChild(section('Статусы в группе', statusBlock(a, ps), 'avoid-break', function () { return mStatus(a, ps); }));
@@ -348,6 +349,124 @@
       graph(proto, 'pos', graphNodes(a, ps), edgesFor(a, ps, 1), { title: 'положительные выборы' }), graphLegend('single', 1)), 'graph-sec'));
     container.appendChild(section('Социограмма отрицательных выборов', h('div', null,
       graph(proto, 'neg', graphNodes(a, ps), edgesFor(a, ps, -1), { title: 'отрицательные выборы' }), graphLegend('single', -1)), 'graph-sec'));
+  }
+
+  // ---------- Краткий отчёт ----------
+  // Два листа A4: 1) список со статусами, круговая диаграмма и таблица статусов;
+  // 2) социограммы положительных и отрицательных выборов и, по желанию, подписи.
+  // Подписи хранятся в протоколе (proto.signs = {on, rows: [{title, name}]});
+  // всё, что когда-либо вводили, - в настройке 'signs' (подсказки и образец для новых протоколов).
+  var SIGN_KEY = 'signs';
+  function signRows(proto) {
+    var s = proto.signs;
+    return s && s.on ? (s.rows || []).filter(function (r) { return (r.title || '').trim() || (r.name || '').trim(); }) : [];
+  }
+  function statusRowsModel(a, ps) {
+    return calc.STATUS_ORDER.map(function (k) {
+      var names = []; a.personal.forEach(function (p, i) { if (p.status === k) names.push(ps[i].name); });
+      return { key: k, label: calc.STATUS[k], desc: App.bw ? BW_FILL_DESC[k] : COLOR_DESC[k], n: a.statusCounts[k],
+        pct: a.N ? Math.round(a.statusCounts[k] / a.N * 100) : 0, names: names };
+    });
+  }
+  function signEditor(proto, onChange) {
+    var hist = { titles: [], names: [], last: null };
+    var box = h('div', { class: 'card sign-editor no-print' });
+    var dlT = h('datalist', { id: 'sign-titles' }), dlN = h('datalist', { id: 'sign-names' });
+    function fillLists() {
+      dlT.innerHTML = ''; dlN.innerHTML = '';
+      hist.titles.forEach(function (t) { dlT.appendChild(h('option', { value: t })); });
+      hist.names.forEach(function (t) { dlN.appendChild(h('option', { value: t })); });
+    }
+    function remember() {
+      var rows = signRows(proto);
+      rows.forEach(function (r) {
+        var t = (r.title || '').trim(), n = (r.name || '').trim();
+        if (t && hist.titles.indexOf(t) < 0) hist.titles.push(t);
+        if (n && hist.names.indexOf(n) < 0) hist.names.push(n);
+      });
+      hist.titles.sort(); hist.names.sort();
+      if (rows.length) hist.last = rows.map(function (r) { return { title: r.title || '', name: r.name || '' }; });
+      fillLists();
+      return SM.store.putSetting(SIGN_KEY, hist);
+    }
+    function save() { onChange(); return App.save(proto).then(remember).catch(function (e) { U.toast(e.message, 'error'); }); }
+    function draw() {
+      box.innerHTML = '';
+      var s = proto.signs || { on: false, rows: [] };
+      var cb = h('input', { type: 'checkbox', checked: !!s.on });
+      cb.addEventListener('change', function () {
+        proto.signs = proto.signs || { on: false, rows: [] };
+        proto.signs.on = cb.checked;
+        if (cb.checked && !proto.signs.rows.length) {
+          proto.signs.rows = hist.last ? hist.last.map(function (r) { return { title: r.title, name: r.name }; }) : [{ title: '', name: '' }];
+        }
+        draw(); save();
+      });
+      box.appendChild(h('label', { class: 'check' }, cb, 'Добавить подписи в конце документа'));
+      box.appendChild(dlT); box.appendChild(dlN);
+      if (!s.on) return;
+      var list = h('div', { class: 'sign-rows' });
+      s.rows.forEach(function (r, i) {
+        var t = h('input', { class: 'input', list: 'sign-titles', placeholder: 'Наименование', value: r.title || '', 'aria-label': 'Наименование' });
+        var n = h('input', { class: 'input', list: 'sign-names', placeholder: 'Инициалы', value: r.name || '', 'aria-label': 'Инициалы' });
+        t.addEventListener('input', function () { r.title = t.value; onChange(); });
+        n.addEventListener('input', function () { r.name = n.value; onChange(); });
+        t.addEventListener('change', save); n.addEventListener('change', save);
+        list.appendChild(h('div', { class: 'sign-edit-row' }, t, h('span', { class: 'sign-gap muted small' }, 'место для подписи'), n,
+          h('button', { type: 'button', class: 'icon-btn', title: 'Удалить строку', 'aria-label': 'Удалить строку подписи', onclick: function () {
+            s.rows.splice(i, 1); draw(); save();
+          } }, '×')));
+      });
+      box.appendChild(list);
+      box.appendChild(h('button', { type: 'button', class: 'btn btn-sm', onclick: function () { s.rows.push({ title: '', name: '' }); draw(); } }, '+ Строка подписи'));
+      if (hist.titles.length || hist.names.length) box.appendChild(h('p', { class: 'muted small' }, 'В полях можно выбрать из того, что вы вводили раньше, или вписать новое.'));
+    }
+    SM.store.getSetting(SIGN_KEY).then(function (v) {
+      if (v) { hist.titles = v.titles || []; hist.names = v.names || []; hist.last = v.last || null; }
+      fillLists(); draw();
+    }).catch(function () { draw(); });
+    draw();
+    return box;
+  }
+  function signBlock(proto) {
+    return h('div', { class: 'sign-block' }, signRows(proto).map(function (r) {
+      return h('div', { class: 'sign-row' }, h('span', { class: 'sign-title' }, r.title || ''), h('span', { class: 'sign-line' }), h('span', { class: 'sign-name' }, r.name || ''));
+    }));
+  }
+  function brief(container, proto) {
+    if (!guard(container, proto)) return;
+    var A = calc.analyzeProtocol(proto), a = A.main, ps = proto.participants;
+    container.classList.add('brief');
+    var sigWrap = h('div');
+    function redrawSigns() { sigWrap.innerHTML = ''; sigWrap.appendChild(signBlock(proto)); }
+    container.appendChild(signEditor(proto, redrawSigns));
+
+    var items = calc.STATUS_ORDER.map(function (k) { return { key: k, label: calc.STATUS[k], value: a.statusCounts[k], color: SM.graph.STATUS_COLORS[k] }; });
+    var list = h('table', { class: 'tbl tbl-compact brief-list' },
+      h('thead', null, h('tr', null, h('th', { class: 'c' }, '№'), h('th', null, 'ФИО'), h('th', null, 'Статус'))),
+      h('tbody', null, a.personal.map(function (p, i) {
+        return h('tr', null, h('td', { class: 'c' }, i + 1), h('td', null, ps[i].name), h('td', null, calc.STATUS[p.status]));
+      })));
+    var stat = h('table', { class: 'tbl tbl-compact brief-status' },
+      h('thead', null, h('tr', null, h('th', null, 'Статус'), h('th', null, 'Обозначение на диаграмме'), h('th', { class: 'c' }, 'Человек'), h('th', { class: 'c' }, '%'), h('th', null, 'Участники'))),
+      h('tbody', null, statusRowsModel(a, ps).map(function (r) {
+        return h('tr', null, h('td', { class: 'nowrap' }, r.label), h('td', { class: 'nowrap' }, swatch(r.key), r.desc),
+          h('td', { class: 'c' }, r.n), h('td', { class: 'c' }, r.pct), h('td', null, r.names.join(', ')));
+      })));
+    container.appendChild(h('section', { class: 'card brief-page brief-p1' },
+      h('h2', { class: 'brief-title' }, proto.name),
+      h('div', { class: 'brief-top' },
+        h('div', { class: 'brief-left' }, list),
+        h('div', { class: 'brief-right' }, h('h2', { class: 'brief-h' }, 'Статусы в группе'),
+          h('div', { class: 'brief-pie' }, SM.graph.pie(items, function () {}, { bw: !!App.bw })))),
+      stat));
+    redrawSigns();
+    container.appendChild(h('section', { class: 'card brief-page brief-p2' },
+      h('h2', { class: 'brief-h' }, 'Положительные выборы'),
+      graph(proto, 'pos', graphNodes(a, ps), edgesFor(a, ps, 1), { title: 'положительные выборы' }), graphLegend('single', 1),
+      h('h2', { class: 'brief-h' }, 'Отрицательные выборы'),
+      graph(proto, 'neg', graphNodes(a, ps), edgesFor(a, ps, -1), { title: 'отрицательные выборы' }), graphLegend('single', -1),
+      sigWrap));
   }
 
   // ---------- Индивидуальный отчёт ----------
@@ -592,6 +711,35 @@
     return Promise.all(Array.prototype.map.call(container.querySelectorAll('.sgram'), function (w) { return w._png ? w._png() : null; }));
   }
 
+  function docBrief(doc, proto, a, ps, imgs, pieImg, icon) {
+    var half = Math.floor(doc.contentW / 2);
+    var left = doc.capture(function () {
+      var rows = [[{ t: '№', align: 'center' }, 'ФИО', 'Статус']];
+      a.personal.forEach(function (p, i) { rows.push([{ t: String(i + 1), align: 'center' }, ps[i].name, calc.STATUS[p.status]]); });
+      doc.table(rows, { header: 1, widthsTw: [450, half - 450 - 1750 - 150, 1750], size: 9 });
+    });
+    var right = doc.capture(function () {
+      doc.p({ t: 'Статусы в группе', b: true, size: 13 }, { align: 'center', spacing: 80 });
+      if (pieImg) doc.image(pieImg, 0.44);
+    });
+    doc.p({ t: proto.name, b: true, size: 12 }, { spacing: 80 });
+    doc.columns([left, right], [half, doc.contentW - half]);
+    var srows = [[{ t: 'Статус' }, { t: 'Обозначение на диаграмме' }, { t: 'Человек', align: 'center' }, { t: '%', align: 'center' }, { t: 'Участники' }]];
+    statusRowsModel(a, ps).forEach(function (r) {
+      srows.push([r.label, { t: r.desc, icon: icon[r.key] }, { t: String(r.n), align: 'center' }, { t: String(r.pct), align: 'center' }, r.names.join(', ')]);
+    });
+    doc.table(srows, { header: 1, widths: [15, 25, 9, 6, 45], size: 9 });
+    // Лист 2: обе социограммы на одной странице (каждая не выше 8,8 см), чтобы с подписями уместиться на листе
+    var maxH = 5000;
+    if (imgs[0]) { doc.h2('Положительные выборы', { pageBreak: true }); doc.image(imgs[0], 1, maxH); docLegendGraph(doc, 'single'); }
+    if (imgs[1]) { doc.h2('Отрицательные выборы', { pageBreak: !imgs[0] }); doc.image(imgs[1], 1, maxH); docLegendGraph(doc, 'single'); }
+    signRows(proto).forEach(function (r, i) {
+      doc.p([{ t: r.title || '' }, { tab: true }, { tab: true }, { t: r.name || '' }], {
+        spacing: 160, before: i ? 0 : 360,
+        tabs: [{ pos: doc.contentW - 2400, val: 'left', leader: 'underscore' }, { pos: doc.contentW, val: 'right' }] });
+    });
+  }
+
   function exportDocx(view, proto, container, pid) {
     var X = SM.exporter, ps = proto.participants;
     if (ps.length < 2) { U.toast('Для отчёта нужно хотя бы два участника.', 'warn'); return; }
@@ -605,7 +753,10 @@
     return Promise.all([graphImages(container), pieSvg && pieSvg._png ? pieSvg._png() : null, icons]).then(function (res) {
       var imgs = res[0], pieImg = res[1], icon = {}, fname;
       calc.STATUS_ORDER.forEach(function (k, i) { icon[k] = res[2][i]; });
-      if (view === 'report') {
+      if (view === 'brief') {
+        docBrief(doc, proto, a, ps, imgs, pieImg, icon);
+        fname = safeName(proto.name) + ' - краткий отчёт.docx';
+      } else if (view === 'report') {
         docHeader(doc, proto);
         doc.h2('Социоматрица');
         doc.p('Строка - кто выбирает, столбец - кого выбрали. Итоговые строки внизу - полученные выборы.', { run: { size: 9, color: '555555' } });
@@ -698,5 +849,5 @@
     }).catch(function (e) { U.toast('Не удалось сделать документ: ' + e.message, 'error'); });
   }
 
-  SM.report = { general: general, person: person, mutual: mutual, exportDocx: exportDocx, exportXlsx: exportXlsx };
+  SM.report = { general: general, brief: brief, person: person, mutual: mutual, exportDocx: exportDocx, exportXlsx: exportXlsx };
 })(window);

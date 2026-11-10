@@ -207,6 +207,7 @@
       if (typeof r !== 'object') r = { t: r };
       var o = Object.assign({}, base, r);
       var pr = (o.b ? '<w:b/>' : '') + (o.i ? '<w:i/>' : '') + (o.color ? '<w:color w:val="' + o.color + '"/>' : '') + (o.size ? '<w:sz w:val="' + o.size * 2 + '"/><w:szCs w:val="' + o.size * 2 + '"/>' : '');
+      if (o.tab) return '<w:r><w:tab/></w:r>';
       return '<w:r>' + (pr ? '<w:rPr>' + pr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(o.t) + '</w:t></w:r>';
     }).join('');
   }
@@ -216,7 +217,8 @@
       (o.pageBreak ? '<w:pageBreakBefore/>' : '') + (o.ind ? '<w:ind w:left="' + o.ind + '" w:hanging="' + (o.hanging || 0) + '"/>' : '') +
       (o.shade ? '<w:shd w:val="clear" w:color="auto" w:fill="' + o.shade + '"/>' : '') +
       (o.border ? '<w:pBdr><w:left w:val="single" w:sz="18" w:space="6" w:color="' + o.border + '"/></w:pBdr>' : '') +
-      (o.spacing !== undefined ? '<w:spacing w:before="0" w:after="' + o.spacing + '"/>' : '') + (o.align ? '<w:jc w:val="' + o.align + '"/>' : '');
+      (o.tabs ? '<w:tabs>' + o.tabs.map(function (t) { return '<w:tab w:val="' + t.val + '"' + (t.leader ? ' w:leader="' + t.leader + '"' : '') + ' w:pos="' + Math.round(t.pos) + '"/>'; }).join('') + '</w:tabs>' : '') +
+      (o.spacing !== undefined ? '<w:spacing w:before="' + (o.before || 0) + '" w:after="' + o.spacing + '"/>' : '') + (o.align ? '<w:jc w:val="' + o.align + '"/>' : '');
     this.body.push('<w:p>' + (ppr ? '<w:pPr>' + ppr + '</w:pPr>' : '') + runs(content, o.run) + '</w:p>');
     return this;
   };
@@ -284,11 +286,31 @@
       '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + emu + '" cy="' + emu + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>' +
       '</a:graphicData></a:graphic></wp:inline></w:drawing></w:r><w:r><w:t xml:space="preserve">  </w:t></w:r>';
   };
-  Doc.prototype.image = function (img, maxW) {
+  // Всё, что добавят вызовы внутри fn, возвращается строкой XML и не попадает в тело документа
+  Doc.prototype.capture = function (fn) {
+    var start = this.body.length;
+    fn();
+    return this.body.splice(start).join('');
+  };
+  // Колонки без рамок: cells - XML-фрагменты (из capture), widths - ширины в twips
+  Doc.prototype.columns = function (cells, widths) {
+    var none = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(function (s) { return '<w:' + s + ' w:val="nil"/>'; }).join('');
+    this.body.push('<w:tbl><w:tblPr><w:tblW w:w="' + widths.reduce(function (s, x) { return s + x; }, 0) + '" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblBorders>' + none +
+      '</w:tblBorders><w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>' +
+      widths.map(function (x) { return '<w:gridCol w:w="' + x + '"/>'; }).join('') + '</w:tblGrid><w:tr>' +
+      cells.map(function (c, i) {
+        c = c || '';
+        // ячейка Word обязана заканчиваться абзацем
+        return '<w:tc><w:tcPr><w:tcW w:w="' + widths[i] + '" w:type="dxa"/><w:vAlign w:val="top"/></w:tcPr>' + c + (/<\/w:p>$/.test(c) ? '' : '<w:p/>') + '</w:tc>';
+      }).join('') + '</w:tr></w:tbl>');
+    this.para('', { spacing: 80 });
+    return this;
+  };
+  Doc.prototype.image = function (img, maxW, maxHtw) {
     var n = this.images.length + 1;
     var widthEmu = Math.round(this.contentW * (maxW || 1) * EMU_PER_TWIP);
     var heightEmu = Math.round(widthEmu * img.h / img.w);
-    var maxH = Math.round((this.pageH - 2 * this.margin - 1200) * EMU_PER_TWIP);
+    var maxH = Math.round((maxHtw || (this.pageH - 2 * this.margin - 1200)) * EMU_PER_TWIP);
     if (heightEmu > maxH) { widthEmu = Math.round(widthEmu * maxH / heightEmu); heightEmu = maxH; }
     this.images.push(img.blob);
     this.body.push('<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">' +

@@ -1,6 +1,6 @@
 [package]
 name = "linx"
-version = "1.0.4"
+version = "1.0.5"
 license = "MIT"
 repository = "https://github.com/makulatury/linx"
 description = "Linx - обработка социометрии"

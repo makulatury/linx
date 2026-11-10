@@ -69,6 +69,7 @@
         var body = h('div', { class: 'proto-body' });
         main.appendChild(body);
         if (view === 'report') return SM.report.general(body, proto);
+        if (view === 'brief') return SM.report.brief(body, proto);
         if (view === 'person') return SM.report.person(body, proto, parts[3]);
         if (view === 'mutual') return SM.report.mutual(body, proto);
         return SM.editor(body, proto);
@@ -97,9 +98,9 @@
   }
 
   function protoHeader(proto, view) {
-    var tabs = [['edit', 'Протокол'], ['report', 'Общий отчёт'], ['person', 'Индивидуальный отчёт'], ['mutual', 'Взаимные выборы']];
+    var tabs = [['edit', 'Протокол'], ['report', 'Общий отчёт'], ['brief', 'Краткий отчёт'], ['person', 'Индивидуальный отчёт'], ['mutual', 'Взаимные выборы']];
     var base = '#/p/' + encodeURIComponent(proto.id);
-    return h('div', { class: 'proto-head' },
+    return h('div', { class: 'proto-head' + (view === 'brief' ? ' brief-head' : '') },
       h('div', { class: 'print-only print-brand' }, App.logo('print-logo'), h('b', null, 'Linx'), h('span', { class: 'muted' }, ' - социометрия')),
       h('div', { class: 'crumbs no-print' }, h('a', { href: '#/' }, '← Все протоколы')),
       h('div', { class: 'proto-title-row' },

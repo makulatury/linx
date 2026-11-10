@@ -290,6 +290,7 @@ ul.plain li { padding: 3px 0; border-bottom: 1px dashed var(--line2); }
 .bw .report-sec .card-title { color: #000; }
 
 /* Печать */
+@page wide { size: A4 landscape; }
 @media print {
   @page { size: A4; margin: 14mm 12mm; }
   body { background: #fff; font-size: 11pt; }
@@ -309,8 +310,45 @@ ul.plain li { padding: 3px 0; border-bottom: 1px dashed var(--line2); }
   .cell-pos, .cell-neg, .badge, .dot, .swatch, .mismatch, .disclaimer, .pie-who-box, .mx-self { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .matrix { font-size: 9pt; }
   .matrix td, .matrix th { padding: 2px 4px; }
+  /* Большая группа: социоматрица печатается на альбомном листе, столбцы - без минимальной ширины */
+  .wide-sec, .proto-head:has(+ .proto-body > .wide-sec:first-child) { page: wide; }
+  .wide-sec .matrix td.c { min-width: 0; }
+  .wide-sec .matrix td, .wide-sec .matrix th { padding: 1px 3px; }
   a { color: inherit; }
   h1 { font-size: 18pt; }
+}
+
+/* Краткий отчёт */
+.brief-title { font-size: 18px; margin: 0 0 12px; }
+.brief-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; margin-bottom: 16px; }
+.brief-h { font-size: 17px; margin: 0 0 8px; }
+.brief-right .brief-h { text-align: center; }
+.brief-pie { max-width: 320px; margin: 0 auto; }
+.brief-list, .brief-status { width: 100%; }
+.brief-p2 .graph-legend { margin-bottom: 14px; }
+.brief-p2 .sgram { margin-bottom: 6px; }
+.sign-editor .check { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; cursor: pointer; }
+.sign-rows { display: grid; gap: 8px; margin: 12px 0; }
+.sign-edit-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(80px, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.sign-gap { text-align: center; border-bottom: 1px solid var(--line); padding-bottom: 2px; }
+.sign-block { margin-top: 18px; }
+.sign-row { display: flex; align-items: flex-end; gap: 6px; margin-top: 16px; }
+.sign-title, .sign-name { white-space: nowrap; }
+.sign-line { flex: 1; border-bottom: 1px solid #111; min-width: 60px; margin-bottom: 4px; }
+@media (max-width: 700px) { .brief-top { grid-template-columns: 1fr; } .sign-edit-row { grid-template-columns: 1fr; } .sign-gap { display: none; } }
+@media print {
+  .brief-head { display: none; }
+  .brief .card { margin: 0; }
+  .brief-p2 { break-before: page; }
+  .brief .sgram-svg { width: auto; max-width: 100%; height: 88mm; margin: 0 auto; }
+  .brief .tbl th, .brief .tbl td { padding: 2pt 5pt; }
+  .brief .graph-legend { margin: 2pt 0 6pt; gap: 2pt; }
+  .brief .sign-block { margin-top: 6pt; }
+  .brief .sign-row { margin-top: 12pt; }
+  .brief .brief-top { gap: 14pt; }
+  .brief-title { font-size: 13pt; margin-bottom: 8pt; }
+  .brief-h { font-size: 13pt; }
+  .brief .graph-legend { break-before: avoid; }
 }
 
 /* Справка: «О программе» */

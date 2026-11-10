@@ -27,13 +27,15 @@
   }
   // Общий радиус узлов социограммы: растёт под самое длинное имя (до RMAX)
   function nodeRadius(nodes) {
+    // в большой группе круги меньше, чтобы они не наползали друг на друга (длинное имя тогда мельче или обрезается)
+    var n = nodes.length, rmax = n > 30 ? 32 : n > 20 ? 36 : RMAX;
     var r = R0;
     nodes.forEach(function (n) {
       if (n.photo) return;
       var b = labelBox(n.name);
       r = Math.max(r, Math.sqrt(Math.pow(b.w / 2 + 4, 2) + b.ymax * b.ymax));
     });
-    return Math.min(RMAX, Math.ceil(r));
+    return Math.min(rmax, Math.ceil(r));
   }
 
   /* Чёрно-белый режим. Статус в ЧБ кодируется:
@@ -149,6 +151,28 @@
         p.y = Math.max(R + 20, Math.min(H - R - 40, p.y));
       });
       t = Math.max(t * 0.985, 0.5);
+    }
+    // Расталкиваем узлы, которые всё-таки легли друг на друга (часто в большой группе
+    // и у узлов без связей, прижатых к краю)
+    var minD = 2 * R + 14;
+    for (it = 0; it < 300; it++) {
+      var moved = false;
+      for (i = 0; i < n; i++) for (j = i + 1; j < n; j++) {
+        var p1 = pos[ids[i]], p2 = pos[ids[j]];
+        var ex = p2.x - p1.x, ey = p2.y - p1.y, ed = Math.sqrt(ex * ex + ey * ey);
+        if (ed >= minD) continue;
+        if (ed < 0.01) { var ang = (i * 7 + j * 13) % 360 * Math.PI / 180; ex = Math.cos(ang); ey = Math.sin(ang); ed = 1; }
+        var push = (minD - ed) / 2 + 0.5;
+        p1.x -= ex / ed * push; p1.y -= ey / ed * push;
+        p2.x += ex / ed * push; p2.y += ey / ed * push;
+        moved = true;
+      }
+      ids.forEach(function (id) {
+        var p = pos[id];
+        p.x = Math.max(R + 30, Math.min(W - R - 30, p.x));
+        p.y = Math.max(R + 20, Math.min(H - R - 40, p.y));
+      });
+      if (!moved) break;
     }
     return pos;
   }
@@ -383,9 +407,14 @@
     redraw(); fit();
     void bg;
     wrap._png = function () {
-      var xs = [], ys = [];
-      nodes.forEach(function (n) { xs.push(pos[n.id].x); ys.push(pos[n.id].y); });
-      var x0 = Math.min.apply(null, xs) - R - 24, x1 = Math.max.apply(null, xs) + R + 24;
+      // Подпись под фото бывает шире круга - учитываем её, чтобы крайние узлы не обрезались
+      var xl = [], xr = [], ys = [];
+      nodes.forEach(function (n) {
+        var hw = R + 24;
+        if (n.photo) splitName(n.name).forEach(function (ln, i) { hw = Math.max(hw, textWidth(clip(ln, 18), 11.5, !i) / 2 + 10); });
+        xl.push(pos[n.id].x - hw); xr.push(pos[n.id].x + hw); ys.push(pos[n.id].y);
+      });
+      var x0 = Math.min.apply(null, xl), x1 = Math.max.apply(null, xr);
       var y0 = Math.min.apply(null, ys) - R - 16, y1 = Math.max.apply(null, ys) + R + 40;
       return renderPng(svg, { x: x0, y: y0, w: Math.max(x1 - x0, 200), h: Math.max(y1 - y0, 150) });
     };
