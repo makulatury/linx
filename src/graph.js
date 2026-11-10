@@ -8,7 +8,33 @@
     star: '#7c3aed', preferred: '#2563eb', accepted: '#0d9488',
     neglected: '#d97706', rejected: '#dc2626', isolated: '#6b7280'
   };
-  var R = 28;
+  var R0 = 28, RMAX = 40; // радиус узла: обычный и предельный для длинных имён
+
+  // Ширина текста в пикселях (через canvas; без него - грубая оценка)
+  var mctx = null;
+  function textWidth(str, size, bold) {
+    try {
+      if (!mctx) mctx = document.createElement('canvas').getContext('2d');
+      mctx.font = (bold ? '600 ' : '400 ') + size + 'px "Segoe UI", Arial, sans-serif';
+      return mctx.measureText(str).width;
+    } catch (e) { return str.length * size * 0.6; }
+  }
+  // Подпись внутри круга: строки, их ширина при 10px и вертикальный размах
+  function labelBox(name) {
+    var ls = splitName(name);
+    var w = Math.max.apply(null, ls.map(function (ln, i) { return textWidth(ln, 10, !i); }));
+    return { lines: ls, w: w, ymax: ls.length === 1 ? 8 : 12 };
+  }
+  // Общий радиус узлов социограммы: растёт под самое длинное имя (до RMAX)
+  function nodeRadius(nodes) {
+    var r = R0;
+    nodes.forEach(function (n) {
+      if (n.photo) return;
+      var b = labelBox(n.name);
+      r = Math.max(r, Math.sqrt(Math.pow(b.w / 2 + 4, 2) + b.ymax * b.ymax));
+    });
+    return Math.min(RMAX, Math.ceil(r));
+  }
 
   /* Чёрно-белый режим. Статус в ЧБ кодируется:
      - в круговой диаграмме и легендах - штриховкой (как узоры заливки в Word);
@@ -83,7 +109,7 @@
   }
 
   // Детерминированная силовая раскладка (Фрюхтерман - Рейнгольд + притяжение к центру)
-  function forceLayout(nodes, edges, W, H) {
+  function forceLayout(nodes, edges, W, H, R) {
     var n = nodes.length, pos = {}, i, j, it;
     if (!n) return pos;
     var cx = W / 2, cy = H / 2, rad = Math.min(W, H) * 0.38;
@@ -177,7 +203,8 @@
     var gEdges = el('g', null, svg), gNodes = el('g', null, svg);
 
     var pos = {};
-    var auto = forceLayout(nodes, edges, W, H);
+    var R = nodeRadius(nodes);
+    var auto = forceLayout(nodes, edges, W, H, R);
     nodes.forEach(function (n) {
       var saved = opts.layout && opts.layout[n.id];
       pos[n.id] = saved ? { x: saved[0], y: saved[1] } : { x: auto[n.id].x, y: auto[n.id].y };
@@ -217,10 +244,16 @@
       } else {
         el('circle', ringAttrs(BW ? '#fff' : '#e5e7eb'), g);
         inner();
-        var ls = splitName(n.name);
+        // Если имя не влезает даже в увеличенный круг - уменьшаем шрифт (не мельче 8px), остаток обрезаем
+        var lb = labelBox(n.name), ls = lb.lines;
+        var room = 2 * (Math.sqrt(Math.max(0, R * R - lb.ymax * lb.ymax)) - 4);
+        var fs = Math.max(8, Math.min(10, 10 * room / (lb.w || 1)));
+        var k = fs / 10;
         ls.forEach(function (ln, i) {
-          var t2 = el('text', { y: (ls.length === 1 ? 4 : -2 + i * 12), 'text-anchor': 'middle', 'font-size': 10, fill: '#111827', 'font-weight': i ? 400 : 600 }, g);
-          t2.textContent = clip(ln, 11);
+          var t2 = el('text', { y: ((ls.length === 1 ? 4 : -2 + i * 12) * k).toFixed(1), 'text-anchor': 'middle', 'font-size': fs.toFixed(2), fill: '#111827', 'font-weight': i ? 400 : 600 }, g);
+          var s = ln;
+          while (s.length > 2 && textWidth(s + (s === ln ? '' : '…'), fs, !i) > room) s = s.slice(0, -1);
+          t2.textContent = s === ln ? ln : s + '…';
         });
       }
       nodeEls[n.id] = g;

@@ -41,10 +41,7 @@
       h('nav', { class: 'topnav' },
         h('a', { href: '#/', 'data-nav': 'home' }, 'Протоколы'),
         h('a', { href: '#/texts', 'data-nav': 'texts' }, 'Тексты отчёта'),
-        h('a', { href: '#/help', 'data-nav': 'help' }, 'Справка')),
-      h('div', { class: 'topbar-actions' },
-        h('button', { type: 'button', class: 'btn btn-ghost', onclick: exportDb, title: 'Скачать всю базу (протоколы, фото, тексты) одним файлом' }, 'Сохранить базу в файл'),
-        h('button', { type: 'button', class: 'btn btn-ghost', onclick: importDb, title: 'Загрузить базу из ранее сохранённого файла' }, 'Загрузить из файла')));
+        h('a', { href: '#/help', 'data-nav': 'help' }, 'Справка')));
     main = h('main', { id: 'main' });
     app.appendChild(nav); app.appendChild(main);
     app.appendChild(h('div', { id: 'toasts', class: 'no-print' }));
@@ -129,7 +126,7 @@
     }
     main.appendChild(h('div', { class: 'page-head' },
       h('div', null, h('h1', null, 'Протоколы социометрии'),
-        h('p', { class: 'muted' }, 'Данные хранятся только на этом компьютере, в папке программы. Время от времени сохраняйте базу в файл - это и резервная копия, и способ перенести всё на другой ПК.')),
+        h('p', { class: 'muted' }, 'Данные сохраняются автоматически, только на этом компьютере. Резервная копия и перенос на другой ПК - в разделе «Справка».')),
       h('div', { class: 'page-actions' },
         h('button', { type: 'button', class: 'btn btn-primary', onclick: createDialog }, '+ Новая социометрия'))));
     main.appendChild(h('div', { class: 'filters card' },
@@ -345,6 +342,9 @@
         h('li', null, 'Откройте «Общий отчёт», «Индивидуальный отчёт» или «Взаимные выборы». Для PDF нажмите «Печать / PDF» и выберите «Сохранить как PDF».')),
       S('Где хранятся данные'),
       P(SM.nativeDataText ? SM.nativeDataText() : ''),
+      h('div', { class: 'page-actions' },
+        h('button', { type: 'button', class: 'btn', onclick: exportDb, title: 'Скачать всю базу (протоколы, фото, тексты) одним файлом' }, 'Сохранить базу в файл'),
+        h('button', { type: 'button', class: 'btn', onclick: importDb, title: 'Загрузить базу из ранее сохранённого файла' }, 'Загрузить из файла')),
       S('Формулы'),
       P('Персональные индексы: Ci+ = R+/(N-1), Ci- = R-/(N-1), Ci = (R+ - R-)/(N-1), E+ = S+/(N-1), E- = S-/(N-1), E = (S+ + S-)/(N-1), Куд = R+/S+. R - полученные выборы, S - сделанные.'),
       P('Статусы определяются по числу полученных положительных выборов относительно среднего по группе (пороги - округлённые 2, 1.5 и 0.5 среднего) и по соотношению отрицательных выборов. Пороги для конкретной группы видны в легенде отчёта.'),

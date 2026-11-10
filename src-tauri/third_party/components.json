@@ -1002,6 +1002,12 @@
 "repository": "https://github.com/tauri-apps/plugins-workspace"
 },
 {
+"name": "tauri-plugin-single-instance",
+"version": "2.5.5",
+"license": "Apache-2.0 OR MIT",
+"repository": "https://github.com/tauri-apps/plugins-workspace"
+},
+{
 "name": "tauri-runtime",
 "version": "2.12.2",
 "license": "Apache-2.0 OR MIT",
