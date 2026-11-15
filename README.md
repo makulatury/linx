@@ -49,12 +49,7 @@ Android (телефоны и планшеты, Android 7 и новее): нуж�
 powershell -ExecutionPolicy Bypass -File build_android.ps1
 ```
 
-Скрипт на PowerShell, а не на Python: если Python установлен из Microsoft Store, Gradle, запущенный из него, не может собрать код на Kotlin.
-
 Результат - в `release/`. Только интерфейс: `python build.py` → `dist/Linx.html`.
-
-Mac для сборки под macOS не обязателен: при публикации релиза на GitHub образ `.dmg` собирается
-и прикладывается к релизу сам (`.github/workflows/macos.yml`).
 
 ## Структура
 
