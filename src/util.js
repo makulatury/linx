@@ -161,6 +161,6 @@
   root.SM.util = {
     h: h, uid: uid, download: download, fmtDate: fmtDate, fmtDateTime: fmtDateTime, toast: toast,
     modal: modal, confirmBox: confirmBox, readPhoto: readPhoto, pickFile: pickFile, debounce: debounce,
-    copyRich: copyRich, copyImage: copyImage, mac: mac, pasteKey: mac ? '⌘V' : 'Ctrl+V'
+    copyRich: copyRich, copyImage: copyImage, mac: mac, pasteKey: /Android/i.test(navigator.userAgent) ? 'удерживайте палец - «Вставить»' : mac ? '⌘V' : 'Ctrl+V'
   };
 })(window);

@@ -13,7 +13,11 @@ Thumbs.db
 
 # Сборка программы (Tauri)
 src-tauri/target/
-src-tauri/gen/
+src-tauri/gen/*
+# Android-проект хранится в репозитории (свои .gitignore внутри исключают сборку)
+!src-tauri/gen/android/
+*.apk
+*.aab
 *.exe
 *.msi
 *.dmg

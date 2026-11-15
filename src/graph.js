@@ -11,6 +11,8 @@
   var R0 = 28, RMAX = 40; // радиус узла: обычный и предельный для длинных имён
 
   // Ширина текста в пикселях (через canvas; без него - грубая оценка)
+  // Основное управление - пальцем (телефон, планшет)
+  function touchScreen() { return !!(root.matchMedia && root.matchMedia('(pointer: coarse)').matches); }
   var mctx = null;
   function textWidth(str, size, bold) {
     try {
@@ -339,15 +341,51 @@
     var drag = null;
     nodes.forEach(function (n) {
       nodeEls[n.id].addEventListener('pointerdown', function (evt) {
+        if (pinch) return;
         evt.stopPropagation(); evt.preventDefault();
         var p = toSvg(evt);
         drag = { id: n.id, dx: pos[n.id].x - p.x, dy: pos[n.id].y - p.y };
         svg.setPointerCapture(evt.pointerId);
         nodeEls[n.id].setAttribute('cursor', 'grabbing');
       });
+      // Палец на узле: страница не прокручивается, узел перетаскивается
+      nodeEls[n.id].addEventListener('touchstart', function (evt) {
+        if (evt.touches.length === 1) evt.preventDefault();
+      }, { passive: false });
     });
+
+    // Сенсорный экран: один палец по фону листает страницу, двумя пальцами - масштаб и сдвиг графа
+    var pinch = null;
+    function touchMid(t) {
+      return { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2,
+        d: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) || 1 };
+    }
+    svg.addEventListener('touchstart', function (evt) {
+      if (evt.touches.length !== 2) return;
+      evt.preventDefault();
+      if (drag && drag.id && moved) saveLayout();
+      drag = null; moved = false;
+      var m = touchMid(evt.touches), r = svg.getBoundingClientRect();
+      pinch = { m: m, vb: { x: vb.x, y: vb.y, w: vb.w, h: vb.h }, rect: r };
+    }, { passive: false });
+    svg.addEventListener('touchmove', function (evt) {
+      if (!pinch || evt.touches.length !== 2) return;
+      evt.preventDefault();
+      var m = touchMid(evt.touches), s = pinch, k = s.m.d / m.d, r = s.rect;
+      // Точка графа, бывшая под серединой между пальцами, остаётся под новой серединой
+      var fx = (s.m.x - r.left) / r.width, fy = (s.m.y - r.top) / r.height;
+      var px = s.vb.x + fx * s.vb.w, py = s.vb.y + fy * s.vb.h;
+      vb.w = s.vb.w * k; vb.h = s.vb.h * k;
+      vb.x = px - ((m.x - r.left) / r.width) * vb.w;
+      vb.y = py - ((m.y - r.top) / r.height) * vb.h;
+      applyVb();
+    }, { passive: false });
+    svg.addEventListener('touchend', function (evt) { if (evt.touches.length < 2) pinch = null; });
+    svg.addEventListener('touchcancel', function () { pinch = null; });
+
     svg.addEventListener('pointerdown', function (evt) {
-      if (drag) return;
+      if (drag || pinch) return;
+      if (evt.pointerType === 'touch') return; // фон под пальцем - прокрутка страницы
       drag = { pan: true, sx: evt.clientX, sy: evt.clientY, vx: vb.x, vy: vb.y, scale: vb.w / svg.getBoundingClientRect().width };
       svg.setPointerCapture(evt.pointerId);
     });
@@ -401,7 +439,10 @@
       resetBtn.hidden = !custom;
     }
     var hint = document.createElement('span');
-    hint.className = 'muted small'; hint.textContent = 'Узлы можно перетаскивать - положение запоминается. Колесо мыши - масштаб, фон - сдвиг.';
+    hint.className = 'muted small';
+    hint.textContent = touchScreen()
+      ? 'Узлы можно перетаскивать пальцем - положение запоминается. Двумя пальцами - масштаб и сдвиг.'
+      : 'Узлы можно перетаскивать - положение запоминается. Колесо мыши - масштаб, фон - сдвиг.';
     bar.appendChild(hint);
 
     redraw(); fit();

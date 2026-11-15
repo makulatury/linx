@@ -179,7 +179,7 @@
     return h('div', null,
       h('div', { class: 'table-scroll' }, h('table', { class: 'tbl' }, h('thead', null, head), body)),
       P ? h('p', { class: 'muted small' }, App.bw ? 'Перцептивный статус, отличающийся от реального, выделен штриховкой.' : 'Перцептивный статус, отличающийся от реального, выделен цветом.') : null,
-      h('p', { class: 'muted small' }, 'R+ и R- - число полученных положительных и отрицательных выборов. Щёлкните по ФИО, чтобы открыть индивидуальный отчёт.'),
+      h('p', { class: 'muted small' }, 'R+ и R- - число полученных положительных и отрицательных выборов. Нажмите на ФИО, чтобы открыть индивидуальный отчёт.'),
       legend);
   }
 
@@ -187,7 +187,7 @@
     var items = calc.STATUS_ORDER.map(function (k) {
       return { key: k, label: calc.STATUS[k], value: a.statusCounts[k], color: SM.graph.STATUS_COLORS[k] };
     });
-    var who = h('div', { class: 'pie-who' }, h('p', { class: 'muted small no-print' }, 'Щёлкните по сектору диаграммы или строке таблицы, чтобы увидеть участников.'));
+    var who = h('div', { class: 'pie-who' }, h('p', { class: 'muted small no-print' }, 'Нажмите на сектор диаграммы или строку таблицы, чтобы увидеть участников.'));
     function show(key) {
       var idxs = []; a.personal.forEach(function (p, i) { if (p.status === key) idxs.push(i); });
       who.innerHTML = '';

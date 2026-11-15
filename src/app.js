@@ -127,7 +127,9 @@
     }
     main.appendChild(h('div', { class: 'page-head' },
       h('div', null, h('h1', null, 'Протоколы социометрии'),
-        h('p', { class: 'muted' }, 'Данные сохраняются автоматически, только на этом компьютере. Резервная копия и перенос на другой ПК - в разделе «Справка».')),
+        h('p', { class: 'muted' }, SM.mobile
+          ? 'Данные сохраняются автоматически, только на этом устройстве. Резервная копия и перенос на другое устройство - в разделе «Справка».'
+          : 'Данные сохраняются автоматически, только на этом компьютере. Резервная копия и перенос на другой ПК - в разделе «Справка».')),
       h('div', { class: 'page-actions' },
         h('button', { type: 'button', class: 'btn btn-primary', onclick: createDialog }, '+ Новая социометрия'))));
     main.appendChild(h('div', { class: 'filters card' },
@@ -220,7 +222,12 @@
     SM.store.listProtocols().then(function (list) {
       var nameInp = h('input', { type: 'text', class: 'input', placeholder: 'Например, отдел продаж, сентябрь 2026' });
       var mode = 'later';
-      var fileInp = h('input', { type: 'file', accept: '.xlsx,.xls,.csv,.txt' });
+      // Своя кнопка вместо системной: подпись системной зависит от языка устройства («Choose File»)
+      var fileInp = h('input', { type: 'file', accept: '.xlsx,.xls,.csv,.txt', style: 'display:none' });
+      var fileName = h('span', { class: 'muted file-name' }, 'файл не выбран');
+      fileInp.addEventListener('change', function () { fileName.textContent = fileInp.files[0] ? fileInp.files[0].name : 'файл не выбран'; });
+      var fileBox = h('div', { class: 'file-pick' }, fileInp,
+        h('button', { type: 'button', class: 'btn', onclick: function () { fileInp.click(); } }, 'Выбрать файл'), fileName);
       var hasChoices = h('input', { type: 'checkbox' });
       var copySel = h('select', { class: 'input' }, list.filter(function (p) { return p.participants.length; }).map(function (p) {
         return h('option', { value: p.id }, p.name + ' (' + p.participants.length + ')');
@@ -238,7 +245,7 @@
         h('div', { class: 'field' }, h('span', null, 'Список участников'),
           opt('later', 'Добавить участников позже'),
           opt('paste', 'Вставить список (по одному ФИО в строке)', pasteArea),
-          opt('file', 'Загрузить из файла XLSX или CSV', h('div', null, fileInp,
+          opt('file', 'Загрузить из файла XLSX или CSV', h('div', null, fileBox,
             h('label', { class: 'check' }, hasChoices, 'Файл уже содержит выборы'),
             h('p', { class: 'muted small' }, 'Список: одна колонка с ФИО (можно с колонкой номеров). Файл с выборами: № | ФИО | 1 | 2 | ..., в клетках «+» или «-». Старый формат XLS нужно пересохранить в XLSX.'))),
           copySel.options.length ? opt('copy', 'Скопировать список из протокола (вместе с фото)', copySel) : null),
@@ -384,8 +391,9 @@
         P('Результаты отчёта не являются психологическим диагнозом и не заменяют профессиональную оценку.'),
         S('Использованные компоненты'),
         P('Программа построена на Tauri' + (tauri ? ' ' + tauri.version + ' (' + tauri.license + ')' : '') + ' и использует ' + comps.length +
-          ' библиотек на Rust. Все они распространяются по свободным лицензиям: ' + lic.join(', ') + '. Окно программы показывает системный компонент ' + (U.mac ? 'WebKit' : 'Microsoft Edge WebView2') + '.'),
-        P('Тексты лицензий также лежат ' + (U.mac ? 'внутри программы (Linx.app/Contents/Resources)' : 'рядом с программой') + ' в файле THIRD-PARTY-LICENSES.txt.'),
+          ' библиотек на Rust. Все они распространяются по свободным лицензиям: ' + lic.join(', ') + '. Окно программы показывает системный компонент ' + (SM.mobile ? 'Android System WebView' : U.mac ? 'WebKit' : 'Microsoft Edge WebView2') + '.'),
+        // На Android отдельного файла рядом с программой нет - тексты лицензий только в разделе ниже
+        SM.mobile ? null : P('Тексты лицензий также лежат ' + (U.mac ? 'внутри программы (Linx.app/Contents/Resources)' : 'рядом с программой') + ' в файле THIRD-PARTY-LICENSES.txt.'),
         h('details', null, h('summary', null, 'Список компонентов'),
           h('div', { class: 'table-scroll' }, h('table', { class: 'tbl' },
             h('thead', null, h('tr', null, h('th', null, 'Компонент'), h('th', null, 'Версия'), h('th', null, 'Лицензия'))),
