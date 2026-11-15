@@ -41,9 +41,7 @@ python3 build_macos.py
 
 Android (телефоны и планшеты, Android 7 и новее): нужны Android Studio (JDK и SDK), NDK, цели Rust
 `aarch64-linux-android`, `armv7-linux-androideabi`, `x86_64-linux-android`, `tauri-cli` 2 и Python 3.
-На Windows также нужен включённый режим разработчика. Скрипт сам находит JDK, SDK и NDK
-(в `JAVA_HOME`, `ANDROID_HOME`, `NDK_HOME` или на обычных местах). Release-сборка подписывается ключом из
-`~/.linx-android/keystore.properties` (или из файла в переменной `LINX_KEYSTORE`); без ключа APK получится неподписанным.
+На Windows также нужен включённый режим разработчика.
 
 ```
 powershell -ExecutionPolicy Bypass -File build_android.ps1
