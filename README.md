@@ -1,6 +1,6 @@
 # Linx
 
-Офлайн-программа для Windows и macOS для обработки социометрии: ввод выборов, индексы и статусы,
+Офлайн-программа для Windows, macOS и Android для обработки социометрии: ввод выборов, индексы и статусы,
 отчёты с социограммами, печать, экспорт в Word и Excel.
 
 Методика и формулы: [docs/METHOD.md](docs/METHOD.md).
@@ -33,6 +33,17 @@ macOS: нужны Xcode Command Line Tools, Rust с целями `aarch64-apple-
 ```
 python3 build_macos.py
 ```
+
+Android (телефоны и планшеты, Android 7 и новее): нужны Android Studio (JDK и SDK), NDK, цели Rust
+`aarch64-linux-android`, `armv7-linux-androideabi`, `x86_64-linux-android` и переменные `JAVA_HOME`, `ANDROID_HOME`, `NDK_HOME`.
+На Windows также нужен включённый режим разработчика. Release-сборка подписывается ключом из
+`~/.linx-android/keystore.properties` (или из файла в переменной `LINX_KEYSTORE`); без ключа APK получится неподписанным.
+
+```
+cargo tauri android build --apk --target aarch64 armv7 x86_64
+```
+
+APK - в `src-tauri/gen/android/app/build/outputs/apk/universal/release/`.
 
 Результат - в `release/`. Только интерфейс: `python build.py` → `dist/Linx.html`.
 

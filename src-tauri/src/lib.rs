@@ -157,7 +157,7 @@ fn setting_put(store: State<Store>, key: String, value: Value) -> Result<(), Str
 /// Записать файл, выбранный пользователем в окне «Сохранить как».
 /// Тело запроса - байты файла, путь - в заголовке x-path (URL-кодирован).
 #[tauri::command]
-fn save_file(request: Request<'_>) -> Result<(), String> {
+fn save_file(app: AppHandle, request: Request<'_>) -> Result<(), String> {
     let path = request
         .headers()
         .get("x-path")
@@ -165,9 +165,37 @@ fn save_file(request: Request<'_>) -> Result<(), String> {
         .ok_or("Не указан путь")?;
     let path = percent_decode(path)?;
     match request.body() {
-        InvokeBody::Raw(bytes) => fs::write(PathBuf::from(path), bytes).map_err(err),
+        InvokeBody::Raw(bytes) => write_user_file(&app, &path, bytes),
+        // На Android тело запроса приходит как JSON, поэтому файл передаётся строкой base64: { data: "..." }
+        #[cfg(mobile)]
+        InvokeBody::Json(v) => {
+            use base64::Engine;
+            let b64 = v.get("data").and_then(|d| d.as_str()).ok_or("Ожидались данные файла")?;
+            let bytes = base64::engine::general_purpose::STANDARD.decode(b64).map_err(err)?;
+            write_user_file(&app, &path, &bytes)
+        }
+        #[allow(unreachable_patterns)]
         _ => Err("Ожидались двоичные данные".into()),
     }
+}
+
+#[cfg(desktop)]
+fn write_user_file(_app: &AppHandle, path: &str, bytes: &[u8]) -> Result<(), String> {
+    fs::write(PathBuf::from(path), bytes).map_err(err)
+}
+
+/// На Android окно «Сохранить как» возвращает адрес content://, а не путь на диске -
+/// записать в него можно только через системный доступ к документам (плагин fs).
+#[cfg(mobile)]
+fn write_user_file(app: &AppHandle, path: &str, bytes: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+    use std::str::FromStr;
+    use tauri_plugin_fs::{FilePath, FsExt, OpenOptions};
+    let target = FilePath::from_str(path).map_err(err)?;
+    let mut opts = OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    let mut file = app.fs().open(target, opts).map_err(err)?;
+    file.write_all(bytes).map_err(err)
 }
 
 fn percent_decode(s: &str) -> Result<String, String> {
@@ -264,24 +292,36 @@ fn third_party_licenses() -> &'static str {
 
 /// Окно печати. На macOS window.print() из страницы ничего не делает, поэтому печать идёт через оболочку
 /// (на Windows она сама вызывает window.print()).
+#[cfg(desktop)]
 #[tauri::command]
 fn print_page(window: WebviewWindow) -> Result<(), String> {
     window.print().map_err(err)
 }
 
+/// На Android печать из встроенного браузера недоступна (нужен системный PrintManager).
+#[cfg(mobile)]
+#[tauri::command]
+fn print_page(_window: WebviewWindow) -> Result<(), String> {
+    Err("Печать на Android пока не поддерживается. Сохраните отчёт в Word и распечатайте его оттуда.".into())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        // Вторая копия программы не запускается: вместо неё на передний план выходит уже открытое окно.
-        // Две копии писали бы в одну папку данных и мешали друг другу.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.show();
-                let _ = w.set_focus();
-                let _ = w.eval("window.smAlreadyRunning && window.smAlreadyRunning()");
-            }
-        }))
+    let builder = tauri::Builder::default();
+    // Вторая копия программы не запускается: вместо неё на передний план выходит уже открытое окно.
+    // Две копии писали бы в одну папку данных и мешали друг другу. На Android система сама держит одну копию.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.unminimize();
+            let _ = w.show();
+            let _ = w.set_focus();
+            let _ = w.eval("window.smAlreadyRunning && window.smAlreadyRunning()");
+        }
+    }));
+    #[cfg(mobile)]
+    let builder = builder.plugin(tauri_plugin_fs::init());
+    builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {

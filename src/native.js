@@ -6,6 +6,17 @@
   var T = root.__TAURI__;
   if (!T || !T.core) return; // вне программы хранилища нет - app.js покажет сообщение
   var invoke = T.core.invoke;
+  var android = /Android/i.test(navigator.userAgent);
+
+  // Содержимое файла строкой base64 (без префикса data:...;base64,)
+  function toBase64(blob) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { var s = String(r.result); resolve(s.slice(s.indexOf(',') + 1)); };
+      r.onerror = function () { reject(r.error); };
+      r.readAsDataURL(blob);
+    });
+  }
 
   root.smNativeStore = {
     listProtocols: function () { return invoke('store_list'); },
@@ -29,9 +40,12 @@
     var f = ext && FILTERS[ext.toLowerCase()];
     return T.dialog.save({ defaultPath: name, filters: f ? [f] : [] }).then(function (path) {
       if (!path) return false;
-      return blob.arrayBuffer().then(function (buf) {
-        return invoke('save_file', new Uint8Array(buf), { headers: { 'x-path': encodeURIComponent(path) } });
-      }).then(function () { return true; });
+      var headers = { headers: { 'x-path': encodeURIComponent(path) } };
+      // На Android двоичное тело запроса до оболочки не доходит - файл передаётся строкой base64
+      var send = android
+        ? toBase64(blob).then(function (b64) { return invoke('save_file', { data: b64 }, headers); })
+        : blob.arrayBuffer().then(function (buf) { return invoke('save_file', new Uint8Array(buf), headers); });
+      return send.then(function () { return true; });
     }).catch(function (e) {
       var U = root.SM && root.SM.util;
       var msg = 'Не удалось сохранить файл: ' + (e && e.message || e);
@@ -45,6 +59,7 @@
   if (root.SM && root.SM.util) root.SM.util.download = nativeDownload;
   root.SM = root.SM || {};
   root.SM.native = true;
+  root.SM.mobile = android; // телефон или планшет: другие тексты
   // Повторный запуск программы: оболочка выводит это окно вперёд и вызывает эту функцию
   root.smAlreadyRunning = function () {
     if (root.SM.util && root.SM.util.toast) root.SM.util.toast('Linx уже открыт - вот это окно. Вторая копия программы не запускается, чтобы не путать данные.');
@@ -54,6 +69,7 @@
   // Текст для справки; до ответа программы - общий вариант.
   var info = null;
   root.SM.nativeDataText = function () {
+    if (android) return 'Все протоколы, фото и ваши тексты хранятся на этом устройстве, во внутренней памяти программы. Всё сохраняется автоматически, интернет не нужен. Если удалить программу, база удалится вместе с ней, поэтому время от времени нажимайте «Сохранить базу в файл» ниже. Этот же файл переносит базу на другое устройство или компьютер: там откройте программу и нажмите «Загрузить из файла».';
     var tail = ' Всё сохраняется автоматически, интернет не нужен. Для резервной копии время от времени нажимайте «Сохранить базу в файл» ниже. Этот же файл переносит базу на другой компьютер: там откройте программу и нажмите «Загрузить из файла».';
     if (!info) return 'Все протоколы, фото и ваши тексты хранятся на этом компьютере в папке данных программы.' + tail;
     if (info.portable) return 'Это переносная версия: все протоколы, фото и ваши тексты хранятся в папке «Linx-данные» рядом с программой (' + info.dir + '). Программу можно переносить вместе с этой папкой, например на флешке.' + tail;
@@ -65,7 +81,18 @@
   };
   root.SM.nativeThirdPartyText = function () { return invoke('third_party_licenses'); };
   root.SM.openUrl = function (url) { return T.opener.openUrl(url); };
-  root.SM.print = function () { return invoke('print_page'); };
+  root.SM.print = function () {
+    // Android: системное окно печати (там же «Сохранить как PDF»); имя задания - название протокола
+    if (root.LinxAndroid && root.LinxAndroid.print) {
+      var h1 = document.querySelector('main h1');
+      root.LinxAndroid.print((h1 && h1.textContent.trim()) || document.title);
+      return Promise.resolve();
+    }
+    return invoke('print_page').catch(function (e) {
+      var U = root.SM.util;
+      if (U && U.toast) U.toast(String(e && e.message || e), 'error');
+    });
+  };
 
   invoke('data_info').then(function (i) {
     info = i;

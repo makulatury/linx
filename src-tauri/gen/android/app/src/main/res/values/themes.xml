@@ -1,0 +1,7 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Интерфейс Linx всегда светлый, поэтому и тема окна светлая даже при тёмной теме телефона:
+         белый фон под строкой состояния и панелью навигации. -->
+    <style name="Theme.linx" parent="Theme.Material3.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>
