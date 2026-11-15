@@ -391,8 +391,9 @@
         P('Результаты отчёта не являются психологическим диагнозом и не заменяют профессиональную оценку.'),
         S('Использованные компоненты'),
         P('Программа построена на Tauri' + (tauri ? ' ' + tauri.version + ' (' + tauri.license + ')' : '') + ' и использует ' + comps.length +
-          ' библиотек на Rust. Все они распространяются по свободным лицензиям: ' + lic.join(', ') + '. Окно программы показывает системный компонент ' + (U.mac ? 'WebKit' : 'Microsoft Edge WebView2') + '.'),
-        P('Тексты лицензий также лежат ' + (U.mac ? 'внутри программы (Linx.app/Contents/Resources)' : 'рядом с программой') + ' в файле THIRD-PARTY-LICENSES.txt.'),
+          ' библиотек на Rust. Все они распространяются по свободным лицензиям: ' + lic.join(', ') + '. Окно программы показывает системный компонент ' + (SM.mobile ? 'Android System WebView' : U.mac ? 'WebKit' : 'Microsoft Edge WebView2') + '.'),
+        // На Android отдельного файла рядом с программой нет - тексты лицензий только в разделе ниже
+        SM.mobile ? null : P('Тексты лицензий также лежат ' + (U.mac ? 'внутри программы (Linx.app/Contents/Resources)' : 'рядом с программой') + ' в файле THIRD-PARTY-LICENSES.txt.'),
         h('details', null, h('summary', null, 'Список компонентов'),
           h('div', { class: 'table-scroll' }, h('table', { class: 'tbl' },
             h('thead', null, h('tr', null, h('th', null, 'Компонент'), h('th', null, 'Версия'), h('th', null, 'Лицензия'))),
