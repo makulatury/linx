@@ -68,7 +68,11 @@
         h('th', { class: 'c' }, 'выборы'), h('th', { class: 'c' }, 'фото'), h('th', null, ''));
       var tbody = h('tbody');
       proto.participants.forEach(function (p, i) { tbody.appendChild(row(p, i)); });
-      tableBox.appendChild(h('div', { class: 'table-scroll' }, h('table', { class: 'tbl editor-tbl' }, h('thead', null, head), tbody)));
+      // Ширины столбцов заданы заранее - при выборе участника таблица не перестраивается и не «прыгает»
+      var cols = ['ed', 'num', 'name', 'v', 'v', 'none'].concat(P ? ['v', 'v', 'none'] : [], ['filled', 'photo', 'del']);
+      var colgroup = h('colgroup', null, cols.map(function (c) { return h('col', { class: 'col-' + c }); }));
+      tableBox.appendChild(h('div', { class: 'table-scroll' }, h('table', { class: 'tbl editor-tbl' + (editing ? ' is-editing' : '') + (P ? ' with-p' : '') },
+        colgroup, h('thead', null, head), tbody)));
     }
 
     function radios(kind, to, prefix) {
@@ -76,9 +80,22 @@
       var name = prefix + '-' + to;
       return [1, -1, 0].map(function (v) {
         var r = h('input', { type: 'radio', name: name, checked: cur === v, 'aria-label': v === 1 ? 'положительный' : v === -1 ? 'отрицательный' : 'без выбора' });
-        r.addEventListener('change', function () { setC(kind, editing, to, v); drawTable(); });
+        r.addEventListener('change', function () {
+          setC(kind, editing, to, v);
+          var tr = r.closest('tr');
+          if (kind === 'choices' && tr) { tr.classList.toggle('row-pos', v === 1); tr.classList.toggle('row-neg', v === -1); }
+          refreshFilled();
+        });
         return h('td', { class: 'c' }, r);
       });
+    }
+
+    // Отметка «выборы: да / нет» у выбирающего меняется сразу, без перерисовки таблицы
+    function filledMark(p) { return App.hasChoices(proto, p.id) ? h('span', { class: 'yes' }, 'да') : h('span', { class: 'muted' }, 'нет'); }
+    function refreshFilled() {
+      var cell = tableBox.querySelector('tr.row-chooser td.filled-cell');
+      var p = proto.participants.filter(function (x) { return x.id === editing; })[0];
+      if (cell && p) { cell.innerHTML = ''; cell.appendChild(filledMark(p)); }
     }
 
     function row(p, i) {
@@ -92,10 +109,10 @@
       edBox.addEventListener('change', function () { editing = edBox.checked ? p.id : null; drawTable(); });
       var nameCell;
       if (isEd) {
-        var ni = h('input', { type: 'text', class: 'input input-sm', value: p.name });
+        var ni = h('input', { type: 'text', class: 'input input-sm name-input', value: p.name, 'aria-label': 'ФИО' });
         ni.addEventListener('change', function () { if (ni.value.trim()) { p.name = ni.value.trim(); save(); } });
         nameCell = h('td', null, ni);
-      } else nameCell = h('td', { class: 'td-name' }, p.name);
+      } else nameCell = h('td', { class: 'td-name', title: p.name }, p.name);
       var choiceCells;
       if (other) {
         choiceCells = [radios('choices', p.id, 'c'), proto.perceptive ? radios('pchoices', p.id, 'p') : null];
@@ -111,10 +128,9 @@
             return [h('td', { class: 'c muted' }, pp || ''), h('td', { class: 'c muted' }, pn || ''), h('td')];
           })() : null];
       }
-      var filled = App.hasChoices(proto, p.id);
       return h('tr', { class: cls },
-        h('td', { class: 'c' }, edBox), h('td', { class: 'c' }, i + 1), nameCell, choiceCells,
-        h('td', { class: 'c' }, filled ? h('span', { class: 'yes' }, 'да') : h('span', { class: 'muted' }, 'нет')),
+        h('td', { class: 'c ed-cell' }, edBox), h('td', { class: 'c' }, i + 1), nameCell, choiceCells,
+        h('td', { class: 'c filled-cell' }, filledMark(p)),
         h('td', { class: 'c' }, photoCell(p)),
         h('td', { class: 'c' }, h('button', { type: 'button', class: 'icon-btn danger', title: 'Удалить участника', 'aria-label': 'Удалить участника', onclick: function () { removeP(p); } }, '×')));
     }

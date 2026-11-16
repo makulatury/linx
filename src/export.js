@@ -196,8 +196,9 @@
     this.images = [];
     this.pageW = this.landscape ? 16838 : 11906;
     this.pageH = this.landscape ? 11906 : 16838;
-    this.margin = 1000;
+    this.margin = opts.margin || 1000;
     this.contentW = this.pageW - 2 * this.margin;
+    this.contentH = this.pageH - 2 * this.margin;
   }
   function runs(content, base) {
     base = base || {};
@@ -259,7 +260,7 @@
         var lines = String(c.t === undefined ? '' : c.t).split('\n');
         var paras = lines.map(function (ln, li) {
           return '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/>' + (c.align ? '<w:jc w:val="' + c.align + '"/>' : '') + '</w:pPr>' +
-            (c.icon && !li ? self.imageRun(c.icon, c.iconPt || 11) : '') +
+            (c.icon && !li ? self.imageRun(c.icon, c.iconPt || 11, c.size || size) : '') +
             runs(ln, { b: c.b || isHead, size: c.size || size, color: c.color }) + '</w:p>';
         }).join('');
         return '<w:tc><w:tcPr>' + tcPr + '</w:tcPr>' + paras + '</w:tc>';
@@ -276,10 +277,12 @@
   };
   // img: {blob, w, h} (из renderPng); maxW - доля ширины страницы
   // Встроенный рисунок как фрагмент строки (для значков в таблицах); размер в пунктах
-  Doc.prototype.imageRun = function (img, pt) {
+  // textPt - кегль строки: значок опускается, чтобы его середина была на уровне середины текста
+  Doc.prototype.imageRun = function (img, pt, textPt) {
     var n = this.images.length + 1, emu = Math.round(pt * 12700);
+    var drop = Math.round(pt - (textPt || 10) * 0.6); // в полупунктах: (pt/2 - 0,3 кегля) * 2
     this.images.push(img.blob);
-    return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' + emu + '" cy="' + emu + '"/><wp:docPr id="' + n + '" name="Значок ' + n + '"/>' +
+    return '<w:r>' + (drop > 0 ? '<w:rPr><w:position w:val="-' + drop + '"/></w:rPr>' : '') + '<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' + emu + '" cy="' + emu + '"/><wp:docPr id="' + n + '" name="Значок ' + n + '"/>' +
       '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
       '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="' + n + '" name="icon' + n + '.png"/><pic:cNvPicPr/></pic:nvPicPr>' +
       '<pic:blipFill><a:blip r:embed="rIdImg' + n + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
@@ -313,7 +316,8 @@
     var maxH = Math.round((maxHtw || (this.pageH - 2 * this.margin - 1200)) * EMU_PER_TWIP);
     if (heightEmu > maxH) { widthEmu = Math.round(widthEmu * maxH / heightEmu); heightEmu = maxH; }
     this.images.push(img.blob);
-    this.body.push('<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">' +
+    // одинарный интервал: иначе межстрочный множитель добавляет к высоте рисунка лишние 10%
+    this.body.push('<w:p><w:pPr><w:spacing w:before="0" w:after="60" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">' +
       '<wp:extent cx="' + widthEmu + '" cy="' + heightEmu + '"/><wp:docPr id="' + n + '" name="Рисунок ' + n + '"/>' +
       '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
       '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="' + n + '" name="image' + n + '.png"/><pic:cNvPicPr/></pic:nvPicPr>' +

@@ -32,7 +32,7 @@
   App.logo = function (cls) { return h('span', { class: cls || 'brand-mark', html: LOGO_SVG }); };
 
   // ---------- Каркас ----------
-  var main;
+  var main, pbar;
   function shell() {
     var app = document.getElementById('app');
     app.innerHTML = '';
@@ -43,7 +43,8 @@
         h('a', { href: '#/texts', 'data-nav': 'texts' }, 'Тексты отчёта'),
         h('a', { href: '#/help', 'data-nav': 'help' }, 'Справка')));
     main = h('main', { id: 'main' });
-    app.appendChild(nav); app.appendChild(main);
+    pbar = h('div', { class: 'preview-bar', hidden: true });
+    app.appendChild(nav); app.appendChild(pbar); app.appendChild(main);
     app.appendChild(h('div', { id: 'toasts', class: 'no-print' }));
   }
 
@@ -57,6 +58,7 @@
     main.innerHTML = '';
     window.scrollTo(0, 0);
     document.body.classList.toggle('bw', !!App.bw && parts[0] === 'p' && !!parts[2] && parts[2] !== 'edit');
+    if (parts[0] !== 'p' || !parts[1]) { App.preview = false; applyPage(null, null); }
     if (!parts.length) { setNav('home'); return desktop(); }
     if (parts[0] === 'texts') { setNav('texts'); return SM.textsView(main); }
     if (parts[0] === 'help') { setNav('help'); return help(); }
@@ -65,6 +67,8 @@
       return SM.store.getProtocol(parts[1]).then(function (proto) {
         if (!proto) { main.appendChild(h('div', { class: 'card' }, h('p', null, 'Протокол не найден.'), h('a', { href: '#/' }, 'К списку'))); return; }
         var view = parts[2] || 'edit';
+        if (view === 'edit') App.preview = false;
+        applyPage(view === 'edit' ? null : view, proto);
         main.appendChild(protoHeader(proto, view));
         var body = h('div', { class: 'proto-body' });
         main.appendChild(body);
@@ -80,21 +84,110 @@
 
   // Переключатель ЧБ и кнопки экспорта (общие для всех отчётов)
   App.bw = (function () { try { return localStorage.getItem('links-bw') === '1'; } catch (e) { return false; } })();
-  function reportActions(proto, view) {
+  // Ориентация листа - своя для каждого вида отчёта (по умолчанию книжная); действует на печать, PDF и Word
+  var ORIENT_KEY = 'linx-orient';
+  var orients = (function () { try { return JSON.parse(localStorage.getItem(ORIENT_KEY)) || {}; } catch (e) { return {}; } })();
+  App.orientOf = function (view) { return orients[view] === 'landscape' ? 'landscape' : 'portrait'; };
+  App.setOrient = function (view, o) {
+    orients[view] = o;
+    try { localStorage.setItem(ORIENT_KEY, JSON.stringify(orients)); } catch (e) { /* без сохранения */ }
+  };
+  App.preview = false;
+  // Перерисовать страницу, не теряя место прокрутки
+  function rerender() { var y = window.scrollY; App.route(); setTimeout(function () { window.scrollTo(0, y); }, 60); }
+
+  // Размер листа для печати, режим предпросмотра и его панель
+  function applyPage(view, proto) {
+    var st = document.getElementById('page-orient');
+    if (!st) { st = h('style', { id: 'page-orient' }); document.head.appendChild(st); }
+    var land = !!view && App.orientOf(view) === 'landscape';
+    st.textContent = '@media print { @page { size: A4 ' + (land ? 'landscape' : 'portrait') + '; } }';
+    var pv = !!view && App.preview;
+    if (pv) ensurePreviewCss();
+    document.body.classList.toggle('preview', pv);
+    document.body.classList.toggle('landscape', land);
+    pbar.innerHTML = '';
+    pbar.hidden = !(pv && proto);
+    if (pv && proto) pbar.appendChild(previewBar(proto, view));
+    fitSheet();
+  }
+  // На узком экране лист уменьшается целиком, чтобы его было видно без прокрутки вбок
+  function fitSheet() {
+    if (!main) return;
+    if (!document.body.classList.contains('preview')) { main.style.zoom = ''; return; }
+    var px = (document.body.classList.contains('landscape') ? 297 : 210) * 96 / 25.4;
+    var k = Math.min(1, (window.innerWidth - 16) / px);
+    main.style.zoom = k < 1 ? k.toFixed(3) : '';
+  }
+  window.addEventListener('resize', fitSheet);
+
+  /* Предпросмотр: правила из @media print копируются один раз с префиксом body.preview -
+     так страница на экране выглядит так же, как на листе. */
+  var previewCssDone = false;
+  function ensurePreviewCss() {
+    if (previewCssDone) return;
+    previewCssDone = true;
+    var out = [];
+    function scope(sel) {
+      sel = sel.trim();
+      return /^(html|body)\b/.test(sel) ? sel.replace(/^(html|body)/, 'body.preview') : 'body.preview ' + sel;
+    }
+    function walk(rules, inPrint) {
+      Array.prototype.forEach.call(rules || [], function (r) {
+        if (r.media && r.cssRules) walk(r.cssRules, inPrint || r.media.mediaText.trim() === 'print');
+        else if (inPrint && r.selectorText) out.push(r.selectorText.split(',').map(scope).join(', ') + ' { ' + r.style.cssText + ' }');
+      });
+    }
+    Array.prototype.forEach.call(document.styleSheets, function (sh) {
+      try { walk(sh.cssRules, false); } catch (e) { /* чужая таблица стилей */ }
+    });
+    var st = document.createElement('style');
+    st.id = 'preview-css';
+    st.textContent = out.join('\n');
+    document.head.appendChild(st);
+  }
+
+  var pid = function () { return decodeURIComponent((location.hash.split('/')[4] || '')); };
+  function bwSwitch() {
     var bw = h('input', { type: 'checkbox', checked: App.bw, role: 'switch', 'aria-label': 'Чёрно-белый режим' });
     bw.addEventListener('change', function () {
       App.bw = bw.checked;
       try { localStorage.setItem('links-bw', App.bw ? '1' : '0'); } catch (e) { /* без сохранения */ }
-      var y = window.scrollY; App.route(); setTimeout(function () { window.scrollTo(0, y); }, 50);
+      rerender();
     });
-    var pid = function () { return decodeURIComponent((location.hash.split('/')[4] || '')); };
+    return h('label', { class: 'switch', title: 'Чёрно-белая версия для печати: вместо цвета - штриховки, пунктиры и разные обводки' }, bw, h('span', { class: 'switch-track' }), 'Ч/Б');
+  }
+  function wordBtn(proto, view) {
+    return h('button', { type: 'button', class: 'btn', title: 'Скачать отчёт в формате Word (.docx) - его можно редактировать', onclick: function () {
+      SM.report.exportDocx(view, proto, document.querySelector('.proto-body'), pid());
+    } }, 'Word');
+  }
+  function printBtn() {
+    return h('button', { type: 'button', class: 'btn btn-primary', onclick: function () { SM.print(); }, title: 'Печать или сохранение в PDF через окно печати' }, 'Печать / PDF');
+  }
+  function reportActions(proto, view) {
     return h('div', { class: 'report-actions no-print' },
-      h('label', { class: 'switch', title: 'Чёрно-белая версия для печати: вместо цвета - штриховки, пунктиры и разные обводки' }, bw, h('span', { class: 'switch-track' }), 'Ч/Б'),
-      h('button', { type: 'button', class: 'btn', title: 'Скачать отчёт в формате Word (.docx) - его можно редактировать', onclick: function () {
-        SM.report.exportDocx(view, proto, document.querySelector('.proto-body'), pid());
-      } }, 'Word'),
+      bwSwitch(),
+      h('button', { type: 'button', class: 'btn', title: 'Как отчёт ляжет на лист A4: ориентация, цвет, переносы страниц', onclick: function () {
+        App.preview = true; App.route();
+      } }, 'Предпросмотр'),
+      wordBtn(proto, view),
       h('button', { type: 'button', class: 'btn', title: 'Скачать все данные в Excel (.xlsx): выборы, индексы, пары, статусы', onclick: function () { SM.report.exportXlsx(proto); } }, 'Excel'),
-      h('button', { type: 'button', class: 'btn btn-primary', onclick: function () { SM.print(); }, title: 'Печать или сохранение в PDF через окно печати' }, 'Печать / PDF'));
+      printBtn());
+  }
+  function previewBar(proto, view) {
+    var cur = App.orientOf(view);
+    var seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Ориентация листа' }, [['portrait', 'Книжная'], ['landscape', 'Альбомная']].map(function (o) {
+      return h('button', { type: 'button', class: 'seg-btn' + (cur === o[0] ? ' on' : ''), 'aria-pressed': cur === o[0] ? 'true' : 'false', onclick: function () {
+        if (App.orientOf(view) === o[0]) return;
+        App.setOrient(view, o[0]); rerender();
+      } }, o[1]);
+    }));
+    return h('div', { class: 'preview-inner' },
+      h('b', { class: 'preview-title' }, 'Предпросмотр'),
+      h('span', { class: 'preview-field' }, h('span', { class: 'muted small' }, 'Лист A4'), seg),
+      bwSwitch(), wordBtn(proto, view), printBtn(),
+      h('button', { type: 'button', class: 'btn btn-ghost', onclick: function () { App.preview = false; rerender(); } }, 'Закрыть'));
   }
 
   function protoHeader(proto, view) {

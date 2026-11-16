@@ -93,7 +93,6 @@
   function swatch(k, kind) { return SM.graph.statusSwatch(k, !!App.bw, kind || 'fill'); }
   // Словесное описание обозначений (для легенд в Word и подписей)
   var BW_FILL_DESC = { star: 'сплошная заливка', preferred: 'косая штриховка', accepted: 'точки', neglected: 'горизонтальные линии', rejected: 'сетка', isolated: 'без заливки' };
-  var BW_RING_DESC = { star: 'двойная', preferred: 'толстая сплошная', accepted: 'тонкая', neglected: 'штрихами', rejected: 'крупными точками', isolated: 'тонкая серая' };
   var COLOR_DESC = { star: 'фиолетовый', preferred: 'синий', accepted: 'бирюзовый', neglected: 'оранжевый', rejected: 'красный', isolated: 'серый' };
   function nameList(ps, idxs) { return idxs.map(function (i) { return ps[i].name; }).join(', '); }
   function pairText(ps, pr) { return ps[pr[0]].name + ' - ' + ps[pr[1]].name; }
@@ -315,13 +314,24 @@
   /* mode: 'single' - граф одного знака со стрелками (поясняем только взаимные связи);
      'mutual' - только взаимные связи одного знака (линии не поясняем);
      'all' - общий граф взаимных выборов (поясняем + и -). sign - знак для 'single'. */
+  // Та же легенда для картинки социограммы (Word, PNG, Excel) - рисуется в graph.js
+  function legendSpec(mode, sign) {
+    var bw = !!App.bw, lines = [];
+    if (mode === 'all') lines = [{ sign: 1, thick: true, text: 'взаимно-положительный выбор' },
+      { sign: -1, thick: true, dashed: true, text: 'взаимно-отрицательный выбор (пунктир)' }];
+    else if (mode === 'single') lines = [{ sign: sign, dashed: sign < 0 && bw, text: 'выбор (стрелка - к кому)' },
+      { sign: sign, thick: true, dashed: sign < 0 && bw, text: 'взаимный выбор (толще, стрелки с двух сторон)' }];
+    return { bw: bw, lines: lines, ringTitle: (bw ? 'Вид обводки' : 'Цвет обводки') + ' - статус:',
+      statuses: calc.STATUS_ORDER.map(function (k) { return { key: k, label: calc.STATUS[k] }; }) };
+  }
   function graphLegend(mode, sign) {
     var negCls = 'lg-line neg dashed';
     var lines = mode === 'all'
       ? [h('span', { class: 'lg-item' }, h('i', { class: 'lg-line pos thick' }), 'взаимно-положительный выбор'),
         h('span', { class: 'lg-item' }, h('i', { class: negCls + ' thick' }), 'взаимно-отрицательный выбор (пунктир)')]
       : mode === 'single'
-        ? [h('span', { class: 'lg-item' }, h('i', { class: (sign < 0 ? 'lg-line neg' + (App.bw ? ' dashed' : '') : 'lg-line pos') + ' thick' }), 'взаимный выбор (толще, стрелки с двух сторон)')]
+        ? [h('span', { class: 'lg-item' }, h('i', { class: sign < 0 ? 'lg-line neg' + (App.bw ? ' dashed' : '') : 'lg-line pos' }), 'выбор (стрелка - к кому)'),
+          h('span', { class: 'lg-item' }, h('i', { class: (sign < 0 ? 'lg-line neg' + (App.bw ? ' dashed' : '') : 'lg-line pos') + ' thick' }), 'взаимный выбор (толще, стрелки с двух сторон)')]
         : [];
     return h('div', { class: 'graph-legend small' },
       lines.length ? h('div', { class: 'lg-row' }, lines) : null,
@@ -346,9 +356,9 @@
     if (A.perc) container.appendChild(section('Групповые индексы по перцептивным выборам', groupTable(A.perc), '', function () { return mGroup(A.perc); }));
     container.appendChild(section('Интерпретация и рекомендации', interpretation(A, proto)));
     container.appendChild(section('Социограмма положительных выборов', h('div', null,
-      graph(proto, 'pos', graphNodes(a, ps), edgesFor(a, ps, 1), { title: 'положительные выборы' }), graphLegend('single', 1)), 'graph-sec'));
+      graph(proto, 'pos', graphNodes(a, ps), edgesFor(a, ps, 1), { title: 'положительные выборы', legend: legendSpec('single', 1) }), graphLegend('single', 1)), 'graph-sec'));
     container.appendChild(section('Социограмма отрицательных выборов', h('div', null,
-      graph(proto, 'neg', graphNodes(a, ps), edgesFor(a, ps, -1), { title: 'отрицательные выборы' }), graphLegend('single', -1)), 'graph-sec'));
+      graph(proto, 'neg', graphNodes(a, ps), edgesFor(a, ps, -1), { title: 'отрицательные выборы', legend: legendSpec('single', -1) }), graphLegend('single', -1)), 'graph-sec'));
   }
 
   // ---------- Краткий отчёт ----------
@@ -437,6 +447,8 @@
     if (!guard(container, proto)) return;
     var A = calc.analyzeProtocol(proto), a = A.main, ps = proto.participants;
     container.classList.add('brief');
+    // большая группа: таблицы плотнее, чтобы первый лист уместился на A4
+    if (ps.length > 26) container.classList.add('brief-dense');
     var sigWrap = h('div');
     function redrawSigns() { sigWrap.innerHTML = ''; sigWrap.appendChild(signBlock(proto)); }
     container.appendChild(signEditor(proto, redrawSigns));
@@ -462,10 +474,11 @@
       stat));
     redrawSigns();
     container.appendChild(h('section', { class: 'card brief-page brief-p2' },
-      h('h2', { class: 'brief-h' }, 'Положительные выборы'),
-      graph(proto, 'pos', graphNodes(a, ps), edgesFor(a, ps, 1), { title: 'положительные выборы' }), graphLegend('single', 1),
-      h('h2', { class: 'brief-h' }, 'Отрицательные выборы'),
-      graph(proto, 'neg', graphNodes(a, ps), edgesFor(a, ps, -1), { title: 'отрицательные выборы' }), graphLegend('single', -1),
+      // заголовок, граф и легенда при печати не разрываются
+      h('div', { class: 'brief-graph' }, h('h2', { class: 'brief-h' }, 'Положительные выборы'),
+        graph(proto, 'pos', graphNodes(a, ps), edgesFor(a, ps, 1), { title: 'положительные выборы', legend: legendSpec('single', 1) }), graphLegend('single', 1)),
+      h('div', { class: 'brief-graph' }, h('h2', { class: 'brief-h' }, 'Отрицательные выборы'),
+        graph(proto, 'neg', graphNodes(a, ps), edgesFor(a, ps, -1), { title: 'отрицательные выборы', legend: legendSpec('single', -1) }), graphLegend('single', -1)),
       sigWrap));
   }
 
@@ -517,7 +530,7 @@
       eg.nodes.forEach(function (k) { ids[ps[k].id] = true; });
       var edges = eg.edges.map(function (e) { return { from: ps[e.from].id, to: ps[e.to].id, sign: sign, mutual: e.mutual }; });
       return graph(proto, 'ego' + (sign > 0 ? 'pos-' : 'neg-') + me.id, graphNodes(a, ps, ids), edges,
-        { title: me.name + (sign > 0 ? ' - положительные' : ' - отрицательные') });
+        { title: me.name + (sign > 0 ? ' - положительные' : ' - отрицательные'), legend: legendSpec('single', sign) });
     }
     container.appendChild(section('Социограмма положительных выборов участника', h('div', null, ego(1), graphLegend('single', 1)), 'graph-sec'));
     container.appendChild(section('Социограмма отрицательных выборов участника', h('div', null, ego(-1), graphLegend('single', -1)), 'graph-sec'));
@@ -529,12 +542,12 @@
     var A = calc.analyzeProtocol(proto), a = A.main, ps = proto.participants;
     var pos = edgesFor(a, ps, 1, { mutualOnly: true }), neg = edgesFor(a, ps, -1, { mutualOnly: true });
     container.appendChild(section('Взаимно-положительные выборы (' + pos.length + ')', h('div', null,
-      graph(proto, 'mutpos', graphNodes(a, ps), pos, { title: 'взаимно-положительные', emptyText: 'Нет взаимных положительных выборов.' }), graphLegend('mutual')), 'graph-sec'));
+      graph(proto, 'mutpos', graphNodes(a, ps), pos, { title: 'взаимно-положительные', emptyText: 'Нет взаимных положительных выборов.', legend: legendSpec('mutual') }), graphLegend('mutual')), 'graph-sec'));
     container.appendChild(section('Взаимно-отрицательные выборы (' + neg.length + ')', h('div', null,
-      graph(proto, 'mutneg', graphNodes(a, ps), neg, { title: 'взаимно-отрицательные' }), graphLegend('mutual')), 'graph-sec'));
+      graph(proto, 'mutneg', graphNodes(a, ps), neg, { title: 'взаимно-отрицательные', legend: legendSpec('mutual') }), graphLegend('mutual')), 'graph-sec'));
     container.appendChild(section('Общая социограмма взаимных выборов', h('div', null,
       h('p', { class: 'muted small' }, 'Отрицательные связи показаны пунктиром, чтобы их было видно и при чёрно-белой печати.'),
-      graph(proto, 'mutall', graphNodes(a, ps), pos.concat(neg), { title: 'взаимные выборы', dashedNegative: true }), graphLegend('all')), 'graph-sec'));
+      graph(proto, 'mutall', graphNodes(a, ps), pos.concat(neg), { title: 'взаимные выборы', dashedNegative: true, legend: legendSpec('all') }), graphLegend('all')), 'graph-sec'));
   }
 
 
@@ -650,7 +663,6 @@
         drawings.push({ type: 'image', blob: im.blob, w: im.w, h: im.h, widthPx: 620, from: { col: 0, row: r + 1 } });
         r += Math.ceil(hpx / 20) + 3;
       });
-      rows[r] = [{ v: '' + (BWX ? 'Обводка узла - статус: ' + calc.STATUS_ORDER.map(function (k) { return calc.STATUS[k].toLowerCase() + ' - ' + BW_RING_DESC[k]; }).join('; ') + '.' : 'Цвет обводки узла - статус.'), s: 'wrap' }];
       for (var i = 0; i < r; i++) if (!rows[i]) rows[i] = [];
       sheets.push({ name: 'Социограммы', rows: rows, widths: [100], drawings: drawings });
       return X.xlsx(sheets);
@@ -677,7 +689,7 @@
     doc.p('Участников: ' + proto.participants.length + '. Дата протокола: ' + U.fmtDate(proto.created) + '. Отчёт сформирован ' + U.fmtDateTime(new Date().toISOString()) + '.' + (App.bw ? ' Чёрно-белая версия.' : ''), { run: { color: '555555', size: 9 } });
   }
   function docMatrix(doc, an, ps, st) {
-    var N = an.N, mc = mutualCounts(an), size = N > 20 ? 7 : N > 12 ? 8 : 9;
+    var N = an.N, mc = mutualCounts(an), size = N > 24 ? 7 : N > 16 ? 8 : N > 12 ? 9 : 10;
     var rows = [[{ t: '№', align: 'center' }, 'ФИО'].concat(ps.map(function (p, j) { return { t: String(j + 1), align: 'center' }; }))];
     an.M.forEach(function (row, i) {
       rows.push([{ t: String(i + 1), align: 'center' }, ps[i].name].concat(row.map(function (v, j) {
@@ -698,41 +710,40 @@
     var rest = (total - wNum - wName) / N;
     doc.table(rows, { header: 1, widthsTw: [wNum, wName].concat(ps.map(function () { return rest; })), size: size });
   }
-  function docLegendGraph(doc, mode) {
-    var bw = !!App.bw;
-    var line = mode === 'all' ? 'Сплошная линия - взаимно-положительный выбор, пунктир - взаимно-отрицательный.'
-      : mode === 'mutual' ? '' : 'Стрелка - направление выбора. Толстая линия со стрелками с двух сторон - взаимный выбор.';
-    if (line) doc.p(line, { run: { size: 9, color: '444444' }, spacing: 40 });
-    doc.p((bw ? 'Обводка узла показывает статус: ' : 'Цвет обводки показывает статус: ') + calc.STATUS_ORDER.map(function (k) {
-      return calc.STATUS[k].toLowerCase() + ' - ' + (bw ? BW_RING_DESC[k] : COLOR_DESC[k]);
-    }).join('; ') + '.', { run: { size: 9, color: '444444' } });
-  }
   function graphImages(container) {
     return Promise.all(Array.prototype.map.call(container.querySelectorAll('.sgram'), function (w) { return w._png ? w._png() : null; }));
   }
 
+  // Таблица статусов: текст и значки - по левому краю, числа - по центру
+  function docStatusTable(doc, a, ps, icon, size) {
+    var srows = [[{ t: 'Статус', align: 'left' }, { t: 'Обозначение на диаграмме', align: 'left' }, { t: 'Человек', align: 'center' }, { t: '%', align: 'center' }, { t: 'Участники', align: 'left' }]];
+    statusRowsModel(a, ps).forEach(function (r) {
+      srows.push([{ t: r.label, align: 'left' }, { t: r.desc, icon: icon[r.key], iconPt: size + 2, align: 'left' }, { t: String(r.n), align: 'center' },
+        { t: String(r.pct), align: 'center' }, { t: r.names.join(', '), align: 'left' }]);
+    });
+    doc.table(srows, { header: 1, widths: [19, 23, 9, 6, 43], size: size });
+  }
   function docBrief(doc, proto, a, ps, imgs, pieImg, icon) {
-    var half = Math.floor(doc.contentW / 2);
+    var half = Math.floor(doc.contentW / 2), N = ps.length;
+    var fs = N > 32 ? 9 : N > 25 ? 10 : 11;
     var left = doc.capture(function () {
       var rows = [[{ t: '№', align: 'center' }, 'ФИО', 'Статус']];
       a.personal.forEach(function (p, i) { rows.push([{ t: String(i + 1), align: 'center' }, ps[i].name, calc.STATUS[p.status]]); });
-      doc.table(rows, { header: 1, widthsTw: [450, half - 450 - 1750 - 150, 1750], size: 9 });
+      var stW = fs > 10 ? 1950 : 1750;
+      doc.table(rows, { header: 1, widthsTw: [450, half - 450 - stW - 150, stW], size: fs });
     });
     var right = doc.capture(function () {
-      doc.p({ t: 'Статусы в группе', b: true, size: 13 }, { align: 'center', spacing: 80 });
-      if (pieImg) doc.image(pieImg, 0.44);
+      doc.p({ t: 'Статусы в группе', b: true, size: 14 }, { align: 'center', spacing: 80 });
+      if (pieImg) doc.image(pieImg, 0.48);
     });
-    doc.p({ t: proto.name, b: true, size: 12 }, { spacing: 80 });
+    doc.p({ t: proto.name, b: true, size: 14 }, { spacing: 100 });
     doc.columns([left, right], [half, doc.contentW - half]);
-    var srows = [[{ t: 'Статус' }, { t: 'Обозначение на диаграмме' }, { t: 'Человек', align: 'center' }, { t: '%', align: 'center' }, { t: 'Участники' }]];
-    statusRowsModel(a, ps).forEach(function (r) {
-      srows.push([r.label, { t: r.desc, icon: icon[r.key] }, { t: String(r.n), align: 'center' }, { t: String(r.pct), align: 'center' }, r.names.join(', ')]);
-    });
-    doc.table(srows, { header: 1, widths: [15, 25, 9, 6, 45], size: 9 });
-    // Лист 2: обе социограммы на одной странице (каждая не выше 8,8 см), чтобы с подписями уместиться на листе
-    var maxH = 5000;
-    if (imgs[0]) { doc.h2('Положительные выборы', { pageBreak: true }); doc.image(imgs[0], 1, maxH); docLegendGraph(doc, 'single'); }
-    if (imgs[1]) { doc.h2('Отрицательные выборы', { pageBreak: !imgs[0] }); doc.image(imgs[1], 1, maxH); docLegendGraph(doc, 'single'); }
+    docStatusTable(doc, a, ps, icon, fs);
+    // Лист 2: обе социограммы (с легендой на картинке) на одной странице, вместе с подписями
+    var signs = signRows(proto).length;
+    var maxH = Math.floor((doc.contentH - 2 * 900 - (signs ? 500 + signs * 560 : 0)) / 2);
+    if (imgs[0]) { doc.h2('Положительные выборы', { pageBreak: true }); doc.image(imgs[0], 1, maxH); }
+    if (imgs[1]) { doc.h2('Отрицательные выборы', { pageBreak: !imgs[0] }); doc.image(imgs[1], 1, maxH); }
     signRows(proto).forEach(function (r, i) {
       doc.p([{ t: r.title || '' }, { tab: true }, { tab: true }, { t: r.name || '' }], {
         spacing: 160, before: i ? 0 : 360,
@@ -744,7 +755,7 @@
     var X = SM.exporter, ps = proto.participants;
     if (ps.length < 2) { U.toast('Для отчёта нужно хотя бы два участника.', 'warn'); return; }
     var A = calc.analyzeProtocol(proto), a = A.main, st = docStyle(!!App.bw);
-    var doc = new X.Doc({ landscape: view === 'report' && a.N > 14 });
+    var doc = new X.Doc({ landscape: App.orientOf(view) === 'landscape', margin: view === 'brief' ? 720 : 850 });
     U.toast('Готовлю документ Word...');
     var pieSvg = container.querySelector('.pie-svg');
     var icons = Promise.all(calc.STATUS_ORDER.map(function (k) {
@@ -780,25 +791,19 @@
             [p.Rp, p.Rn].map(function (x) { return { t: String(x), align: 'center' }; }),
             [p.CiPos, p.CiNeg, p.Ci, p.EPos, p.ENeg, p.E, p.Kud].map(function (x) { return { t: fmt(x), align: 'center' }; })));
         });
-        doc.table(rows, { header: 1, widths: [3, 20, 13].concat(A.perc ? [13] : [], [5, 5, 6, 6, 6, 6, 6, 6, 6]), size: 9 });
+        doc.table(rows, { header: 1, widths: [3, 19, 15].concat(A.perc ? [15] : [], [5, 5, 6, 6, 6, 6, 6, 6, 6]), size: doc.landscape || a.N <= 30 ? 10 : 9 });
         ['CiPos', 'CiNeg', 'Ci', 'EPos', 'ENeg', 'E', 'Kud'].forEach(function (k) { doc.p(T.get('pidx.' + k), { run: { size: 9, color: '444444' }, spacing: 20 }); });
         doc.h2('Статусы в группе');
-        if (pieImg) doc.image(pieImg, 0.4);
-        var srows = [[{ t: 'Статус' }, { t: 'Обозначение на диаграмме' }, { t: 'Человек', align: 'center' }, { t: '%', align: 'center' }, { t: 'Участники' }]];
-        calc.STATUS_ORDER.forEach(function (k) {
-          var names = []; a.personal.forEach(function (p, i) { if (p.status === k) names.push(ps[i].name); });
-          srows.push([calc.STATUS[k], { t: App.bw ? BW_FILL_DESC[k] : COLOR_DESC[k], icon: icon[k] }, { t: String(a.statusCounts[k]), align: 'center' },
-            { t: String(a.N ? Math.round(a.statusCounts[k] / a.N * 100) : 0), align: 'center' }, names.join(', ')]);
-        });
-        doc.table(srows, { header: 1, widths: [15, 27, 9, 6, 43], size: 9 });
+        if (pieImg) doc.image(pieImg, doc.landscape ? 0.36 : 0.5);
+        docStatusTable(doc, a, ps, icon, 10.5);
         doc.p('Среднее число выборов на одного участника: положительных - ' + fmt(a.meanPosMade) + ', отрицательных - ' + fmt(a.meanNegMade) + '.');
         doc.h3('Как определяется статус');
         var sv = statusVars(a);
         calc.STATUS_ORDER.forEach(function (k) { doc.item('•', T.get('status.' + k, sv)); });
         function gTable(an) {
           var r = [[{ t: '№', align: 'center' }, 'Индекс', { t: 'Значение', align: 'center' }, 'Что показывает']];
-          groupRows(an).forEach(function (g, i) { r.push([{ t: String(i + 1), align: 'center' }, { t: g.name, b: true }, { t: g.text, align: 'center', b: true }, { t: g.desc, size: 8 }]); });
-          doc.table(r, { header: 1, widths: [4, 26, 14, 56], size: 9 });
+          groupRows(an).forEach(function (g, i) { r.push([{ t: String(i + 1), align: 'center' }, { t: g.name, b: true }, { t: g.text, align: 'center', b: true }, { t: g.desc, size: 9 }]); });
+          doc.table(r, { header: 1, widths: [4, 26, 14, 56], size: 10 });
         }
         doc.h2('Групповые индексы'); gTable(a);
         if (A.perc) { doc.h2('Групповые индексы по перцептивным выборам'); gTable(A.perc); }
@@ -807,8 +812,8 @@
         d.paras.forEach(function (t) { doc.p(t); });
         if (d.recs.length) { doc.h3('Рекомендации'); d.recs.forEach(function (t, i) { doc.item((i + 1) + '.', t); }); }
         doc.p(d.disclaimer, { shade: st.disc.shade, border: st.disc.border });
-        if (imgs[0]) { doc.h2('Социограмма положительных выборов', { pageBreak: true }); doc.image(imgs[0]); docLegendGraph(doc, 'single'); }
-        if (imgs[1]) { doc.h2('Социограмма отрицательных выборов', { pageBreak: true }); doc.image(imgs[1]); docLegendGraph(doc, 'single'); }
+        if (imgs[0]) { doc.h2('Социограмма положительных выборов', { pageBreak: true }); doc.image(imgs[0]); }
+        if (imgs[1]) { doc.h2('Социограмма отрицательных выборов', { pageBreak: true }); doc.image(imgs[1]); }
         fname = safeName(proto.name) + ' - отчёт.docx';
       } else if (view === 'person') {
         var i = ps.findIndex(function (p) { return p.id === pid; }); if (i < 0) i = 0;
@@ -832,8 +837,8 @@
           ['Взаимные отрицательные', who(function (k) { return M[k][i] === -1 && M[i][k] === -1; })]
         ].map(function (r) { return [{ t: r[0], b: true }, r[1]]; }), { widths: [30, 70], size: 10 });
         ['CiPos', 'CiNeg', 'Ci', 'EPos', 'ENeg', 'E', 'Kud'].forEach(function (k) { doc.p(T.get('pidx.' + k), { run: { size: 9, color: '444444' }, spacing: 20 }); });
-        if (imgs[0]) { doc.h2('Социограмма положительных выборов участника', { pageBreak: true }); doc.image(imgs[0]); docLegendGraph(doc, 'single'); }
-        if (imgs[1]) { doc.h2('Социограмма отрицательных выборов участника', { pageBreak: true }); doc.image(imgs[1]); docLegendGraph(doc, 'single'); }
+        if (imgs[0]) { doc.h2('Социограмма положительных выборов участника', { pageBreak: true }); doc.image(imgs[0]); }
+        if (imgs[1]) { doc.h2('Социограмма отрицательных выборов участника', { pageBreak: true }); doc.image(imgs[1]); }
         fname = safeName(proto.name) + ' - ' + safeName(me.name) + '.docx';
       } else {
         docHeader(doc, proto, proto.name + ': взаимные выборы');
@@ -841,7 +846,7 @@
         imgs.forEach(function (im, k) {
           if (!im) return;
           doc.h2(titles[k], { pageBreak: k > 0 });
-          doc.image(im); docLegendGraph(doc, k === 2 ? 'all' : 'mutual');
+          doc.image(im);
         });
         fname = safeName(proto.name) + ' - взаимные выборы.docx';
       }

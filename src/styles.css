@@ -122,7 +122,7 @@ input[type=search], input[type=date] { padding: 7px 10px; border: 1px solid var(
 .settings-row { display: flex; flex-wrap: wrap; gap: 18px 24px; align-items: flex-end; }
 .settings-row .grow { flex: 1 1 300px; }
 .settings-row > .check { padding-bottom: 9px; }
-.hint { margin: 0 2px 10px; font-size: 13.5px; }
+.hint { margin: 0 2px 10px; font-size: 13.5px; min-height: 2.9em; }
 .table-card { padding: 6px; }
 .table-scroll { overflow-x: auto; }
 .tbl { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
@@ -133,7 +133,18 @@ input[type=search], input[type=date] { padding: 7px 10px; border: 1px solid var(
 .tbl tr.clickable { cursor: pointer; }
 .tbl tr.clickable:hover td { background: #f7f8fb; }
 .td-name { white-space: nowrap; }
-.editor-tbl td { padding: 5px 9px; }
+.editor-tbl td { padding: 5px 9px; height: 36px; box-sizing: border-box; }
+/* Таблица выборов: постоянные ширины столбцов и высота строк, чтобы при выборе участника ничего не сдвигалось */
+.editor-tbl { table-layout: fixed; min-width: 720px; }
+.editor-tbl.with-p { min-width: 920px; }
+.editor-tbl .col-ed { width: 92px; } .editor-tbl .col-num { width: 48px; }
+.editor-tbl .col-v { width: 54px; } .editor-tbl .col-none { width: 96px; }
+.editor-tbl .col-filled { width: 78px; } .editor-tbl .col-photo { width: 100px; } .editor-tbl .col-del { width: 46px; }
+.editor-tbl .td-name { overflow: hidden; text-overflow: ellipsis; }
+.editor-tbl .name-input { width: 100%; box-sizing: border-box; height: 25px; padding-top: 0; padding-bottom: 0; }
+/* Пока заполняются выборы одного участника, галочки «изменить» у остальных бледнее */
+.editor-tbl.is-editing tr:not(.row-chooser) .ed-cell input { opacity: .3; transition: opacity .12s; }
+.editor-tbl.is-editing tr:not(.row-chooser) .ed-cell input:hover, .editor-tbl.is-editing tr:not(.row-chooser) .ed-cell input:focus-visible { opacity: 1; }
 .editor-tbl tr.row-chooser td { background: #eceff3; font-weight: 600; }
 .editor-tbl tr.row-pos td { background: var(--pos-l); }
 .editor-tbl tr.row-neg td { background: var(--warn-l); }
@@ -315,9 +326,8 @@ ul.plain li { padding: 3px 0; border-bottom: 1px dashed var(--line2); }
 .bw .report-sec .card-title { color: #000; }
 
 /* Печать */
-@page wide { size: A4 landscape; }
 @media print {
-  @page { size: A4; margin: 14mm 12mm; }
+  @page { size: A4; margin: 10mm; }
   body { background: #fff; font-size: 11pt; }
   .no-print, .topbar, #toasts, .sgram-bar, .tabs, .crumbs { display: none !important; }
   .print-only { display: block; margin-bottom: 8px; }
@@ -328,6 +338,10 @@ ul.plain li { padding: 3px 0; border-bottom: 1px dashed var(--line2); }
   .report-sec > h2 { break-after: avoid; border-bottom: 1px solid #999; padding-bottom: 3pt; }
   .avoid-break, .graph-sec, tr, .pie-row { break-inside: avoid; }
   .graph-sec { break-before: page; }
+  /* первая социограмма вида (взаимные выборы) - сразу под шапкой, без пустого листа */
+  .proto-body > .graph-sec:first-child { break-before: auto; }
+  /* альбомный лист: граф ограничен высотой листа, чтобы заголовок, граф и легенда были на одной странице */
+  .landscape .graph-sec .sgram-svg { width: auto; max-width: 100%; height: 150mm; margin: 0 auto; }
   .sgram { border: 0; }
   .sgram-svg { max-height: none; }
   .table-scroll { overflow: visible; }
@@ -335,10 +349,12 @@ ul.plain li { padding: 3px 0; border-bottom: 1px dashed var(--line2); }
   .cell-pos, .cell-neg, .badge, .dot, .swatch, .mismatch, .disclaimer, .pie-who-box, .mx-self { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .matrix { font-size: 9pt; }
   .matrix td, .matrix th { padding: 2px 4px; }
-  /* Большая группа: социоматрица печатается на альбомном листе, столбцы - без минимальной ширины */
-  .wide-sec, .proto-head:has(+ .proto-body > .wide-sec:first-child) { page: wide; }
+  /* Большая группа: социоматрица плотнее, столбцы - без минимальной ширины (лист - как выбран в предпросмотре) */
+  .wide-sec .matrix { font-size: 8pt; }
   .wide-sec .matrix td.c { min-width: 0; }
-  .wide-sec .matrix td, .wide-sec .matrix th { padding: 1px 3px; }
+  .wide-sec .matrix td, .wide-sec .matrix th { padding: 1px 2px; }
+  .tbl { font-size: 10.5pt; }
+  .pie-box { width: 75mm; }
   a { color: inherit; }
   h1 { font-size: 18pt; }
 }
@@ -365,14 +381,24 @@ ul.plain li { padding: 3px 0; border-bottom: 1px dashed var(--line2); }
   .brief-head { display: none; }
   .brief .card { margin: 0; }
   .brief-p2 { break-before: page; }
-  .brief .sgram-svg { width: auto; max-width: 100%; height: 88mm; margin: 0 auto; }
-  .brief .tbl th, .brief .tbl td { padding: 2pt 5pt; }
+  .brief .sgram-svg { width: auto; max-width: 100%; height: 104mm; margin: 0 auto; }
+  .landscape .brief .sgram-svg { height: 150mm; }
+  .brief-graph { break-inside: avoid; }
+  .landscape .brief-graph + .brief-graph { break-before: page; }
+  /* большая группа: первый лист длиннее - социограммы идут сразу за ним, без пустого остатка листа */
+  .brief-dense .brief-p2 { break-before: auto; margin-top: 8pt; }
+  .brief-dense .sgram-svg { height: 130mm; }
+  .brief .tbl { font-size: 11pt; line-height: 1.25; }
+  .brief .tbl th, .brief .tbl td { padding: 1.5pt 6pt; }
+  .brief-dense .tbl { font-size: 10.5pt; }
+  .brief-dense .tbl th, .brief-dense .tbl td { padding: 1pt 5pt; }
+  .brief .brief-pie { max-width: 88mm; }
   .brief .graph-legend { margin: 2pt 0 6pt; gap: 2pt; }
   .brief .sign-block { margin-top: 6pt; }
   .brief .sign-row { margin-top: 12pt; }
   .brief .brief-top { gap: 14pt; }
-  .brief-title { font-size: 13pt; margin-bottom: 8pt; }
-  .brief-h { font-size: 13pt; }
+  .brief-title { font-size: 15pt; margin-bottom: 8pt; }
+  .brief-h { font-size: 14pt; }
   .brief .graph-legend { break-before: avoid; }
 }
 
@@ -382,3 +408,28 @@ ul.plain li { padding: 3px 0; border-bottom: 1px dashed var(--line2); }
 .about-text { white-space: pre-wrap; max-height: 360px; overflow: auto; font-size: 12px; line-height: 1.45; background: #f6f7f9; padding: 12px; border-radius: 8px; }
 .about .tbl { font-size: 13px; }
 @media print { .about { display: none; } }
+
+/* Предпросмотр перед печатью и экспортом: страница показывается листом A4
+   (сами правила печати копирует app.js с префиксом body.preview) */
+.preview-bar { position: sticky; top: 0; z-index: 30; background: #fff; border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }
+.preview-bar[hidden] { display: none; }
+.preview-inner { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; justify-content: center; padding: 10px 16px; }
+.preview-title { margin-right: 6px; }
+.preview-field { display: inline-flex; align-items: center; gap: 8px; }
+body.preview { background: #d9dde3; }
+body.preview #main { box-sizing: content-box; width: 190mm; max-width: none; padding: 10mm; margin: 16px auto 48px; background: #fff;
+  box-shadow: 0 2px 14px rgba(0,0,0,.18); }
+body.preview.landscape #main { width: 277mm; }
+body.preview .graph-sec, body.preview .brief-p2 { position: relative; border-top: 1px dashed #9ca3af; padding-top: 8mm; margin-top: 8mm; }
+body.preview .proto-body > .graph-sec:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+body.preview .proto-body > .graph-sec:first-child::before { content: none; }
+body.preview .graph-sec::before, body.preview .brief-p2::before { content: 'новый лист'; position: absolute; top: -9px; right: 0; padding: 0 6px;
+  background: #fff; color: #6b7280; font-size: 11px; }
+/* «only print» - чтобы эти правила не попали в сам предпросмотр (он копирует только @media print) */
+@media only print {
+  .preview-bar { display: none !important; }
+  body.preview { background: #fff; }
+  body.preview #main { zoom: 1 !important; width: auto; padding: 0; margin: 0; box-shadow: none; }
+  body.preview .graph-sec, body.preview .brief-p2 { border-top: 0; padding-top: 0; margin-top: 0; }
+  body.preview .graph-sec::before, body.preview .brief-p2::before { content: none; }
+}

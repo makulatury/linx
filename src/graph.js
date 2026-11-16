@@ -418,11 +418,11 @@
     zoomBtn.setAttribute('aria-label', 'Масштаб; нажмите, чтобы вернуть 100%');
     zoomBtn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg><span>100%</span>';
-    btn('Скачать PNG', function () { downloadPng(svg, vb, opts.fileName || 'sociogram'); });
+    btn('Скачать PNG', function () { downloadPng(svg, vb, opts.fileName || 'sociogram', opts.legend); });
     btn('Копировать', function () {
       // ClipboardItem принимает Promise - так браузер не теряет «жест пользователя», пока рисуется картинка
       var U = root.SM.util;
-      var png = renderPng(svg, vb).then(function (r) { return r.blob; });
+      var png = renderPng(svg, vb, null, opts.legend).then(function (r) { return r.blob; });
       var job = (navigator.clipboard && window.ClipboardItem)
         ? navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
         : png.then(U.copyImage);
@@ -447,6 +447,7 @@
 
     redraw(); fit();
     void bg;
+    // Картинка всего графа (по крайним узлам) с легендой внизу, если она задана (opts.legend)
     wrap._png = function () {
       // Подпись под фото бывает шире круга - учитываем её, чтобы крайние узлы не обрезались
       var xl = [], xr = [], ys = [];
@@ -457,17 +458,63 @@
       });
       var x0 = Math.min.apply(null, xl), x1 = Math.max.apply(null, xr);
       var y0 = Math.min.apply(null, ys) - R - 16, y1 = Math.max.apply(null, ys) + R + 40;
-      return renderPng(svg, { x: x0, y: y0, w: Math.max(x1 - x0, 200), h: Math.max(y1 - y0, 150) });
+      var w = Math.max(x1 - x0, 200), hgt = Math.max(y1 - y0, 150);
+      // слишком узкий граф растягиваем по ширине, чтобы легенда не становилась высокой и мелкой
+      if (opts.legend && w < 560) { x0 -= (560 - w) / 2; w = 560; }
+      return renderPng(svg, { x: x0, y: y0, w: w, h: hgt }, null, opts.legend);
     };
     return wrap;
   }
 
-  // SVG -> PNG (Blob) в заданной области просмотра
-  function renderPng(svg, vb, minWidth) {
+  /* Легенда, нарисованная в SVG (для картинок социограмм).
+     spec: {lines: [{sign: 1|-1, dashed, thick, text}], ringTitle, statuses: [{key, label}], bw}
+     Рисуется в единицах графа шириной width; возвращает {g, h}. */
+  function legendGroup(spec, width) {
+    var FS = 15, ROW = 26, GAP = 24, PAD = 6;
+    var g = el('g', { 'font-family': 'Segoe UI, Arial, sans-serif', 'font-size': FS, fill: '#374151' });
+    var x = PAD, y = 0, rows = 0;
+    function place(w) {
+      if (x > PAD && x + w > width - PAD) { x = PAD; y += ROW; rows++; }
+      var at = x; x += w + GAP; return at;
+    }
+    function text(str, tx, bold) {
+      var t = el('text', { x: tx.toFixed(1), y: (y + ROW / 2 + FS * 0.35).toFixed(1), 'font-weight': bold ? 600 : 400 }, g);
+      t.textContent = str;
+    }
+    var bw = !!spec.bw;
+    (spec.lines || []).forEach(function (ln) {
+      var tw = textWidth(ln.text, FS), at = place(34 + 8 + tw);
+      var col = bw ? '#111' : (ln.sign < 0 ? COLORS.neg : COLORS.pos), cy = y + ROW / 2;
+      el('line', { x1: at, y1: cy, x2: at + 34, y2: cy, stroke: col, 'stroke-width': ln.thick ? 4 : 2, 'stroke-dasharray': ln.dashed ? '7 5' : null }, g);
+      text(ln.text, at + 42);
+    });
+    if (spec.lines && spec.lines.length) { x = PAD; y += ROW; rows++; }
+    if (spec.ringTitle) { var tt = textWidth(spec.ringTitle, FS, true); text(spec.ringTitle, place(tt)); x -= GAP - 10; }
+    (spec.statuses || []).forEach(function (s) {
+      var tw = textWidth(s.label, FS), at = place(24 + 6 + tw), cy = y + ROW / 2;
+      var rg = bw ? BW_SWATCH[s.key] : { w: 3, dash: null };
+      el('circle', { cx: at + 12, cy: cy, r: 9.5, fill: bw ? '#fff' : '#e5e7eb', stroke: bw ? (rg.color || '#111') : STATUS_COLORS[s.key], 'stroke-width': rg.w, 'stroke-dasharray': rg.dash, 'stroke-linecap': 'round' }, g);
+      if (bw && rg.double) el('circle', { cx: at + 12, cy: cy, r: 5.6, fill: 'none', stroke: '#111', 'stroke-width': 1.1 }, g);
+      text(s.label, at + 30);
+    });
+    return { g: g, h: (rows + 1) * ROW + 14 };
+  }
+
+  // SVG -> PNG (Blob) в заданной области просмотра; legend - спецификация легенды под рисунком
+  function renderPng(svg, vb, minWidth, legend) {
     return new Promise(function (resolve, reject) {
+      var clone = svg.cloneNode(true);
+      if (legend) {
+        // Ширина легенды в единицах графа: не меньше 640, чтобы на узком графе текст не был огромным
+        var lw = Math.max(vb.w, 640), k = vb.w / lw;
+        var lg = legendGroup(legend, lw);
+        var sep = el('line', { x1: vb.x, x2: vb.x + vb.w, y1: vb.y + vb.h + 2, y2: vb.y + vb.h + 2, stroke: '#d1d5db', 'stroke-width': 1 });
+        lg.g.setAttribute('transform', 'translate(' + vb.x.toFixed(1) + ',' + (vb.y + vb.h + 8).toFixed(1) + ') scale(' + k.toFixed(4) + ')');
+        clone.appendChild(sep); clone.appendChild(lg.g);
+        vb = { x: vb.x, y: vb.y, w: vb.w, h: vb.h + lg.h * k + 4 };
+      }
       var scale = Math.max(2, (minWidth || 1600) / vb.w);
       var W2 = Math.round(vb.w * scale), H2 = Math.round(vb.h * scale);
-      var clone = svg.cloneNode(true);
       clone.setAttribute('viewBox', [vb.x, vb.y, vb.w, vb.h].join(' '));
       clone.setAttribute('width', W2); clone.setAttribute('height', H2);
       if (!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', NS);
@@ -486,8 +533,8 @@
       img.src = url;
     });
   }
-  function downloadPng(svg, vb, name) {
-    renderPng(svg, vb).then(function (r) { root.SM.util.download(r.blob, name + '.png'); })
+  function downloadPng(svg, vb, name, legend) {
+    renderPng(svg, vb, null, legend).then(function (r) { root.SM.util.download(r.blob, name + '.png'); })
       .catch(function (e) { alert(e.message); });
   }
 
